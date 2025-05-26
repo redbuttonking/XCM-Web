@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }],
+  "compilerOptions": {
+    "baseUrl": ".", // 프로젝트 루트 기준
+    "paths": {
+      "@/*": ["src/*"] // ✅ 경로 alias
+    },
+    "types": ["node"]
+  }
+}
