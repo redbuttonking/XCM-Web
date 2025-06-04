@@ -2,7 +2,7 @@
 import React, { useEffect, useRef } from 'react';
 import { connectAndJoinProtoo } from '../../RoomClient';
 
-const wsUrl = 'wss://localhost:4000/?roomId=monitoringRoom&peerId=peer1';
+const wsUrl = 'wss://localhost:4443/?roomId=monitoringRoom&peerId=peer1';
 
 const joinPayload = {
   displayName: '현수',
@@ -37,12 +37,14 @@ const Monitoring = () => {
       onClose: () => {
         // 연결 종료 시
         console.log('연결이 닫힘');
+        console.log('확실히 연결이 닫힌거 맞나?');
       },
       onNotification: (notification) => {
         // 서버가 notification을 보낼 때
         console.log('서버 알림:', notification);
       },
     });
+    console.log(peerRef.current._transport);
 
     // unmount 시 연결 닫기
     return () => {
@@ -52,8 +54,8 @@ const Monitoring = () => {
 
   return (
     <div>
-      <h2>모니터링 페이지 - mediasoup signaling 테스트</h2>
-      {/* 추후 비디오 요소, 참가자 목록 등 추가 가능 */}
+      <h2>모니터링 페이지</h2>
+      <h2>mediasoup signaling 테스트</h2>
     </div>
   );
 };
