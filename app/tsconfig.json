@@ -2,10 +2,14 @@
   "files": [],
   "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }],
   "compilerOptions": {
-    "baseUrl": ".", // 프로젝트 루트 기준
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "allowJs": true,
+    "moduleResolution": "node",
+    "baseUrl": "./", 
     "paths": {
       "@/*": ["src/*"] // ✅ 경로 alias
     },
-    "types": ["node"]
+    "types": ["react", "node"]
   }
 }
