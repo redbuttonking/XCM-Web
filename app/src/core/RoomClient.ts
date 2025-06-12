@@ -57,7 +57,6 @@ export default class RoomClient {
     this._protoo = new protooClient.Peer(transport);
 
     this._protoo.on('request', async (request: any, accept: any, reject: any) => {
-      console.log('request 값 확인 : ', request);
       if (request.method === 'newConsumer') {
         const { peerId, producerId, id, kind, rtpParameters, appData } = request.data;
         try {
@@ -86,7 +85,7 @@ export default class RoomClient {
 
       const peers = await this._joinRoom();
 
-      // ✅ 기존에 참여 중인 peer들 등록
+      // 기존에 참여 중인 peer들 등록
       if (Array.isArray(peers)) {
         const { addPeer } = useRoomStore.getState();
         peers
@@ -95,6 +94,11 @@ export default class RoomClient {
             addPeer({ id: peer.id, displayName: peer.displayName });
           });
       }
+      //  방에 입장 완료 후 내 미디어 연결
+      await this.enableMic();
+      await this.enableWebcam();
+
+      await this._protoo.request('resumeConsumers');
     });
 
     this._protoo.on('close', () => this.close());
@@ -115,11 +119,8 @@ export default class RoomClient {
         addPeer({ id, displayName });
       } // 퇴실한 peer 제거 처리 (서버에서 상대 peer이 나갔을 때 알려주는 이벤트)
       else if (method === 'peerClosed' || method === 'peerDisconnected') {
-        console.log('여기 엘스 이프 문 왜 안걸려?');
         const { peerId } = data;
-
         console.log('[RoomClient] peer 퇴실 알림:', peerId);
-
         const { removePeer } = useRoomStore.getState();
         removePeer(peerId);
       }
@@ -176,13 +177,11 @@ export default class RoomClient {
 
       if (Array.isArray(peers)) {
         const { addPeer } = useRoomStore.getState();
-        console.log('디스 피얼 아이디가 뭔데?', this._peerId);
 
         peers
           .filter((peer) => peer.id !== this._peerId)
           .forEach((peer) => {
             addPeer({ id: peer.id, displayName: peer.displayName });
-            console.log('필터로 걸린거 맞음? ', peer);
           });
       }
 
@@ -218,14 +217,22 @@ export default class RoomClient {
   }
 
   async enableMic(): Promise<void> {
-    if (this._micProducer || !this._mediasoupDevice?.canProduce('audio')) return;
+    const { setMicTrack, setMicEnabled } = useRoomStore.getState();
+
+    // 이미 producer가 있고, 꺼져 있는 경우에는 다시 활성화만
+    if (this._micProducer?.track && !this._micProducer.track.enabled) {
+      this._micProducer.track.enabled = true;
+      setMicEnabled(true);
+      return;
+    }
+
+    // 이미 producer가 있다면 produce() 하지 않음
+    if (this._micProducer) return;
 
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const track = stream.getAudioTracks()[0];
     this._micProducer = await this._sendTransport!.produce({ track });
 
-    // ✅ 상태 업데이트 여기서 직접
-    const { setMicTrack, setMicEnabled } = useRoomStore.getState();
     setMicTrack(track);
     setMicEnabled(true);
   }
@@ -244,14 +251,14 @@ export default class RoomClient {
   }
 
   async disableMic(): Promise<void> {
-    if (!this._micProducer) return;
-    this._micProducer.close();
-    this._micProducer = null;
-    0;
+    const { setMicEnabled } = useRoomStore.getState();
 
-    // ✅ 상태 업데이트
-    const { setMicTrack, setMicEnabled } = useRoomStore.getState();
-    setMicTrack(null);
+    if (!this._micProducer?.track) return;
+
+    // 오디오(마이크) 트랙 비활성화(음소거)
+    this._micProducer.track.enabled = false;
+
+    // 상태 업데이트
     setMicEnabled(false);
   }
 

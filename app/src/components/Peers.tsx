@@ -12,7 +12,7 @@ const Peers = () => {
 
   const peers = allPeers.filter((peer) => peer.id !== peerId);
 
-  console.log('참가자 인원수 : ', peers);
+  console.log('참가자 인원 정보  : ', peers);
   console.log('나의 peer Id 정보 : ', peerId);
 
   if (peers.length === 0)

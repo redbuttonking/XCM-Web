@@ -65,7 +65,7 @@ const MicVolumeMeter = () => {
         <div
           className="h-full bg-yellow-400 transition-all duration-75 ease-out"
           style={{
-            width: `${Math.max(volume, 2)}%`, // 최소값 2% 보장
+            width: `${Math.max(volume, 2)}%`, // 최소값 2%
           }}
         />
       </div>

@@ -246,7 +246,6 @@ class Room extends EventEmitter {
         .then(async () => {
           // ✅ join 처리 후 다른 Peer들에게 알림
           if (request.method === "join") {
-            console.log("[Server] join 이후 consumer 생성 루프 진입!");
             for (const otherPeer of this._getJoinedPeers({
               excludePeer: peer,
             })) {
@@ -1613,8 +1612,6 @@ class Room extends EventEmitter {
    * @async
    */
   async _createConsumer({ consumerPeer, producerPeer, producer }) {
-    console.log("실행했다 임마 _createConsumer: 실행했다 임마");
-
     // Optimization:
     // - Create the server-side Consumer in paused mode.
     // - Tell its Peer about it and wait for its response.
@@ -1744,10 +1741,6 @@ class Room extends EventEmitter {
 
           // Send a protoo request to the remote Peer with Consumer parameters.
           try {
-            console.log(
-              "[Server] 서버서버서버서  Sending newConsumer request to peer:",
-              consumerPeer.id
-            );
             await consumerPeer.request("newConsumer", {
               peerId: producerPeer.id,
               producerId: producer.id,

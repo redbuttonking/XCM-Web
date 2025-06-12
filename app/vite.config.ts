@@ -34,11 +34,14 @@ export default defineConfig({
     },
   },
   server: {
+    host: '0.0.0.0',
+    port: 3000,
     https: {
       key: fs.readFileSync(path.resolve(__dirname, '../server/key.pem')),
       cert: fs.readFileSync(path.resolve(__dirname, '../server/cert.pem')),
     },
-    host: 'localhost',
-    port: 3000,
+
+    // 로컬 호스트 전용
+    // host: 'localhost',
   },
 });

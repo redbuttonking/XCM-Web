@@ -41,9 +41,6 @@ const Room = () => {
         store.setJoined(false);
       });
 
-    console.log(roomId);
-    console.log(peerId);
-    console.log(displayName);
     return () => {
       client.close();
       store.resetRoom();

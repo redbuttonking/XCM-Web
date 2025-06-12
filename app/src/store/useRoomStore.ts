@@ -5,7 +5,7 @@ export interface PeerInfo {
   id: string;
   displayName: string;
   videoTrack?: MediaStreamTrack;
-  micTrack?: MediaStreamTrack;
+  audioTrack?: MediaStreamTrack;
 }
 
 interface RoomState {
@@ -60,6 +60,7 @@ export const useRoomStore = create<RoomState>((set) => ({
 
   setRoomClient: (client) => set({ roomClient: client }),
 
+  setPeerId: (peerId) => set({ peerId }),
   setPeers: (peers) => set({ peers }),
   addPeer: (peer) =>
     set((state) => {
@@ -92,5 +93,4 @@ export const useRoomStore = create<RoomState>((set) => ({
       screenTrack: null,
       peers: [],
     }),
-  setPeerId: (peerId) => set({ peerId }),
 }));

@@ -53,7 +53,7 @@ const Me = () => {
           {webcamEnabled ? '카메라 끄기' : '카메라 켜기'}
         </button>
       </div>
-      <MicVolumeMeter />
+      {/* <MicVolumeMeter /> */}
     </div>
   );
 };

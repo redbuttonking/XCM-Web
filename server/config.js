@@ -8,15 +8,15 @@
  * calls the mediasoup API with those settings when appropriate.
  */
 
-const os = require('os');
+const os = require("os");
 
 module.exports = {
   // Listening hostname for browser app Vite development server.
-  domain: '0.0.0.0',
+  domain: "0.0.0.0",
   // domain: process.env.DOMAIN || 'localhost',
   // Signaling settings (protoo WebSocket server and HTTP API server).
   https: {
-    listenIp: '0.0.0.0',
+    listenIp: "0.0.0.0",
     // NOTE: Don't change listenPort (client app assumes 4443).
     listenPort: process.env.PROTOO_LISTEN_PORT || 4443,
     // NOTE: Set your own valid certificate files.
@@ -38,8 +38,21 @@ module.exports = {
     workerSettings: {
       dtlsCertificateFile: process.env.WORKER_CERT_FULLCHAIN,
       dtlsPrivateKeyFile: process.env.WORKER_CERT_PRIVKEY,
-      logLevel: 'warn',
-      logTags: ['info', 'ice', 'dtls', 'rtp', 'srtp', 'rtcp', 'rtx', 'bwe', 'score', 'simulcast', 'svc', 'sctp'],
+      logLevel: "warn",
+      logTags: [
+        "info",
+        "ice",
+        "dtls",
+        "rtp",
+        "srtp",
+        "rtcp",
+        "rtx",
+        "bwe",
+        "score",
+        "simulcast",
+        "svc",
+        "sctp",
+      ],
       disableLiburing: false,
     },
     // mediasoup Router options.
@@ -47,48 +60,48 @@ module.exports = {
     routerOptions: {
       mediaCodecs: [
         {
-          kind: 'audio',
-          mimeType: 'audio/opus',
+          kind: "audio",
+          mimeType: "audio/opus",
           clockRate: 48000,
           channels: 2,
         },
         {
-          kind: 'video',
-          mimeType: 'video/VP8',
+          kind: "video",
+          mimeType: "video/VP8",
           clockRate: 90000,
           parameters: {
-            'x-google-start-bitrate': 1000,
+            "x-google-start-bitrate": 1000,
           },
         },
         {
-          kind: 'video',
-          mimeType: 'video/VP9',
+          kind: "video",
+          mimeType: "video/VP9",
           clockRate: 90000,
           parameters: {
-            'profile-id': 2,
-            'x-google-start-bitrate': 1000,
+            "profile-id": 2,
+            "x-google-start-bitrate": 1000,
           },
         },
         {
-          kind: 'video',
-          mimeType: 'video/h264',
+          kind: "video",
+          mimeType: "video/h264",
           clockRate: 90000,
           parameters: {
-            'packetization-mode': 1,
-            'profile-level-id': '4d0032',
-            'level-asymmetry-allowed': 1,
-            'x-google-start-bitrate': 1000,
+            "packetization-mode": 1,
+            "profile-level-id": "4d0032",
+            "level-asymmetry-allowed": 1,
+            "x-google-start-bitrate": 1000,
           },
         },
         {
-          kind: 'video',
-          mimeType: 'video/h264',
+          kind: "video",
+          mimeType: "video/h264",
           clockRate: 90000,
           parameters: {
-            'packetization-mode': 1,
-            'profile-level-id': '42e01f',
-            'level-asymmetry-allowed': 1,
-            'x-google-start-bitrate': 1000,
+            "packetization-mode": 1,
+            "profile-level-id": "42e01f",
+            "level-asymmetry-allowed": 1,
+            "x-google-start-bitrate": 1000,
           },
         },
       ],
@@ -101,20 +114,22 @@ module.exports = {
     webRtcServerOptions: {
       listenInfos: [
         {
-          protocol: 'udp',
-          ip: process.env.MEDIASOUP_LISTEN_IP || '0.0.0.0',
-          announcedAddress: '192.168.0.7', //회사 와이파이,
+          protocol: "udp",
+          ip: process.env.MEDIASOUP_LISTEN_IP || "0.0.0.0",
+          announcedAddress: "192.168.0.7", //회사 와이파이,
           // announcedAddress: '192.168.161.50', // 핫스팟,
-          // 기존 demo코드드
+          // 기존 demo코드
           // announcedAddress: process.env.MEDIASOUP_ANNOUNCED_IP,
           port: 44444,
         },
         {
-          protocol: 'tcp',
-          ip: process.env.MEDIASOUP_LISTEN_IP || '0.0.0.0',
+          protocol: "tcp",
+          ip: process.env.MEDIASOUP_LISTEN_IP || "0.0.0.0",
           // 기존 demoo코드
-          announcedAddress: process.env.MEDIASOUP_ANNOUNCED_IP,
-          // announcedAddress: '192.168.78.50' //핫스팟팟,
+          announcedAddress: "192.168.0.7", //회사 와이파이,
+          // announcedAddress: '192.168.78.50' //핫스팟,
+          // 기존 demo코드
+          // announcedAddress: process.env.MEDIASOUP_ANNOUNCED_IP,
           port: 44444,
         },
       ],
@@ -127,9 +142,9 @@ module.exports = {
       // However passing MEDIASOUP_USE_WEBRTC_SERVER=false will change it.
       listenInfos: [
         {
-          protocol: 'udp',
-          ip: process.env.MEDIASOUP_LISTEN_IP || '0.0.0.0',
-          announcedAddress: '192.168.0.7',
+          protocol: "udp",
+          ip: process.env.MEDIASOUP_LISTEN_IP || "0.0.0.0",
+          announcedAddress: "192.168.0.7",
           // announcedAddress: process.env.MEDIASOUP_ANNOUNCED_IP,
           portRange: {
             min: process.env.MEDIASOUP_MIN_PORT || 40000,
@@ -137,9 +152,10 @@ module.exports = {
           },
         },
         {
-          protocol: 'tcp',
-          ip: process.env.MEDIASOUP_LISTEN_IP || '0.0.0.0',
-          announcedAddress: process.env.MEDIASOUP_ANNOUNCED_IP,
+          protocol: "tcp",
+          ip: process.env.MEDIASOUP_LISTEN_IP || "0.0.0.0",
+          announcedAddress: "192.168.0.7",
+          // announcedAddress: process.env.MEDIASOUP_ANNOUNCED_IP,
           portRange: {
             min: process.env.MEDIASOUP_MIN_PORT || 40000,
             max: process.env.MEDIASOUP_MAX_PORT || 49999,
@@ -157,9 +173,9 @@ module.exports = {
     // See https://mediasoup.org/documentation/v3/mediasoup/api/#PlainTransportOptions
     plainTransportOptions: {
       listenInfo: {
-        protocol: 'udp',
-        ip: process.env.MEDIASOUP_LISTEN_IP || '0.0.0.0',
-        announcedAddress: '192.168.0.7',
+        protocol: "udp",
+        ip: process.env.MEDIASOUP_LISTEN_IP || "0.0.0.0",
+        announcedAddress: "192.168.0.7",
         // 기존 demo 코드
         // announcedAddress: process.env.MEDIASOUP_ANNOUNCED_IP,
         portRange: {
