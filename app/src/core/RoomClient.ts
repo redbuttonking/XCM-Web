@@ -94,11 +94,17 @@ export default class RoomClient {
             addPeer({ id: peer.id, displayName: peer.displayName });
           });
       }
-      //  방에 입장 완료 후 내 미디어 연결
+      //  방에 입장 완료 후 내 미디어 자동 연결 (카메라 , 마이크 on)
       await this.enableMic();
       await this.enableWebcam();
 
-      await this._protoo.request('resumeConsumers');
+      // room 입장시 상대 peer 미디어 연결
+      try {
+        await this.request('resyncMedia');
+        console.log('[RoomClient] 미디어 자동 연결 성공');
+      } catch (err) {
+        console.error('[RoomClient] 미디어 자동 연결 실패:', err);
+      }
     });
 
     this._protoo.on('close', () => this.close());

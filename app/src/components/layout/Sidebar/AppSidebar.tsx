@@ -60,11 +60,6 @@ const AppSidebar = () => {
       url: '/feedbackmanagement',
       icon: <MessagesSquare />,
     },
-    {
-      title: 'Room',
-      url: '/Room',
-      icon: <Monitor />,
-    },
   ];
 
   const screenToolsMenu = [
@@ -102,10 +97,7 @@ const AppSidebar = () => {
             <SidebarMenu>
               {menuItems.map((item) => (
                 <Link to={item.url} key={item.title}>
-                  <SidebarMenuItem
-                    className="mb-[21px] flex h-[48px] justify-center"
-
-                  >
+                  <SidebarMenuItem className="mb-[21px] flex h-[48px] justify-center">
                     <SidebarMenuButton
                       className={`h-full p-[10px] text-[22px] font-semibold text-gray-200 hover:bg-blue group-data-[collapsed=true]:!h-[48px] group-data-[collapsed=true]:!w-[48px] ${location.pathname === item.url ? 'bg-blue text-white' : ''}`}
                     >
@@ -122,7 +114,10 @@ const AppSidebar = () => {
             {/* 화면 관리 */}
             <SidebarMenu className="mt-[21px]">
               {screenToolsMenu.map((item) => (
-                <SidebarMenuItem className="mb-[21px] flex h-[48px] justify-center" key={item.title}>
+                <SidebarMenuItem
+                  className="mb-[21px] flex h-[48px] justify-center"
+                  key={item.title}
+                >
                   <SidebarMenuButton
                     className={`h-full p-[10px] text-[22px] font-semibold text-gray-200 group-data-[collapsed=true]:!h-[48px] group-data-[collapsed=true]:!w-[48px]`}
                   >

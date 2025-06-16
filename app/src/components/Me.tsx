@@ -39,7 +39,7 @@ const Me = () => {
   };
 
   return (
-    <div className="rounded-lg bg-gray-800 p-2">
+    <div className="m-[16px] w-[300px] rounded-lg bg-gray-800 p-2">
       <h2 className="mb-1 text-sm">나</h2>
       <PeerView micTrack={micTrack} videoTrack={webcamTrack} />
       <div className="mt-2 flex gap-2">

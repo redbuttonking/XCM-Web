@@ -35,7 +35,7 @@ const PeerView = ({ videoTrack, audioTrack }: PeerViewProps) => {
         autoPlay
         playsInline
         muted={false}
-        className="h-48 w-full rounded bg-black"
+        className="aspect-video w-full rounded-lg bg-black object-cover"
       />
       <audio ref={audioRef} autoPlay />
     </>

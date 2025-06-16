@@ -13,7 +13,8 @@ const RootLayout = () => {
       }
     >
       <AppSidebar />
-      <main className="flex-1 overflow-y-auto p-[57px]">
+      {/* <main className="mx-auto h-[1080px] w-[1920px] overflow-hidden"> */}
+      <main className="h-screen flex-1 overflow-hidden p-[20px]">
         <SidebarTrigger />
         <Outlet />
       </main>

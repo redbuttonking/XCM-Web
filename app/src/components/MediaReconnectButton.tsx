@@ -22,11 +22,9 @@ const MediaReconnectButton = () => {
   };
 
   return (
-    <div className="flex justify-center p-2">
-      <Button onClick={handleReconnect} disabled={loading}>
-        {loading ? '재연결 중...' : '미디어 연결하기'}
-      </Button>
-    </div>
+    <Button onClick={handleReconnect} disabled={loading}>
+      {loading ? '재연결 중...' : '미디어 연결하기'}
+    </Button>
   );
 };
 
