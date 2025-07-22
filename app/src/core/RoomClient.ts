@@ -32,6 +32,8 @@ export default class RoomClient {
   private _micProducer: mediasoupClient.types.Producer | null = null;
   private _webcamProducer: mediasoupClient.types.Producer | null = null;
 
+  private _dataProducer: mediasoupClient.types.DataProducer | null = null;
+
   constructor({ roomId, peerId, displayName, forceTcp = false }: RoomClientOptions) {
     this._roomId = roomId;
     this._peerId = peerId;
@@ -57,6 +59,8 @@ export default class RoomClient {
     this._protoo = new protooClient.Peer(transport);
 
     this._protoo.on('request', async (request: any, accept: any, reject: any) => {
+      console.log('request.method: ', request.method);
+      console.log('request: ', request);
       if (request.method === 'newConsumer') {
         const { peerId, producerId, id, kind, rtpParameters, appData } = request.data;
         try {
@@ -71,8 +75,50 @@ export default class RoomClient {
           const { updatePeerTrack } = useRoomStore.getState();
           updatePeerTrack(peerId, kind, consumer.track);
 
+          // 🔽 mute 상태를 체크하고, 추후 unmute 되면 다시 업데이트
+          if (kind === 'video') {
+            consumer.track.addEventListener('unmute', () => {
+              console.log(`[RoomClient] 🔊 consumer videoTrack unmuted → UI 갱신`);
+              updatePeerTrack(peerId, 'video', consumer.track); // 강제로 UI 리렌더 유도
+            });
+          }
+
           accept();
         } catch (err) {
+          reject(err);
+        }
+      } else if (request.method === 'newDataConsumer') {
+        const { id, dataProducerId, sctpStreamParameters, label, protocol, appData, peerId } =
+          request.data;
+
+        try {
+          const dataConsumer = await this._recvTransport!.consumeData({
+            id,
+            dataProducerId,
+            sctpStreamParameters,
+            label,
+            protocol,
+            appData,
+          });
+
+          console.log(`[RoomClient] ✅ DataConsumer created from peer ${peerId}`);
+
+          dataConsumer.on('open', () => {
+            console.log(`[RoomClient] 📡 DataConsumer open: ${label}`);
+          });
+
+          dataConsumer.on('message', (message: string | Buffer) => {
+            const text = typeof message === 'string' ? message : new TextDecoder().decode(message);
+            console.log(`[RoomClient] 💬 메시지 수신 from ${peerId}:`, text);
+          });
+
+          dataConsumer.on('close', () => {
+            console.warn('[RoomClient] ❌ DataConsumer closed');
+          });
+
+          accept();
+        } catch (err) {
+          console.error('[RoomClient] Failed to consume data:', err);
           reject(err);
         }
       } else {
@@ -94,9 +140,10 @@ export default class RoomClient {
             addPeer({ id: peer.id, displayName: peer.displayName });
           });
       }
-      //  방에 입장 완료 후 내 미디어 자동 연결 (카메라 , 마이크 on)
-      await this.enableMic();
-      await this.enableWebcam();
+      // 임시로 웹켐 주석 처리
+      //  방에 입장 완료 후 내 미디어 자동 연결 (카메라 on , 마이크 off)
+      // await this.enableMic();
+      // await this.enableWebcam();
 
       // room 입장시 상대 peer 미디어 연결
       try {
@@ -140,10 +187,13 @@ export default class RoomClient {
       const routerRtpCapabilities = await this._protoo.request('getRouterRtpCapabilities');
       await this._mediasoupDevice.load({ routerRtpCapabilities });
 
+      console.log('[join] sctpCapabilities:', this._mediasoupDevice.sctpCapabilities);
+
       const sendTransportInfo = await this._protoo.request('createWebRtcTransport', {
         forceTcp: this._forceTcp,
         producing: true,
         consuming: false,
+        sctpCapabilities: this._mediasoupDevice?.sctpCapabilities,
       });
 
       this._sendTransport = this._mediasoupDevice.createSendTransport({
@@ -175,10 +225,30 @@ export default class RoomClient {
         }
       });
 
+      this._sendTransport.on(
+        'producedata',
+        async ({ sctpStreamParameters, label, protocol, appData }, callback, errback) => {
+          try {
+            const { id } = await this._protoo.request('produceData', {
+              transportId: this._sendTransport!.id,
+              sctpStreamParameters,
+              label,
+              protocol,
+              appData,
+            });
+            callback({ id });
+          } catch (err) {
+            errback(err as Error);
+          }
+        },
+      );
+
       const { peers } = await this._protoo.request('join', {
         displayName: this._displayName,
         device: { flag: 'custom-client' },
         rtpCapabilities: this._mediasoupDevice.rtpCapabilities,
+        sctpCapabilities: this._mediasoupDevice.sctpCapabilities,
+        useDataChannel: true,
       });
 
       if (Array.isArray(peers)) {
@@ -195,6 +265,7 @@ export default class RoomClient {
         forceTcp: this._forceTcp,
         producing: false,
         consuming: true,
+        sctpCapabilities: this._mediasoupDevice?.sctpCapabilities,
       });
 
       this._recvTransport = this._mediasoupDevice.createRecvTransport({
@@ -212,6 +283,37 @@ export default class RoomClient {
           .then(callback)
           .catch(errback);
       });
+
+      try {
+        await this.request('resyncMedia');
+        console.log('[RoomClient] 미디어 자동 연결 성공');
+      } catch (err) {
+        console.error('[RoomClient] 미디어 자동 연결 실패:', err);
+      }
+
+      // ✅ join, transport 생성 등이 모두 끝난 후 dataproducer 생성
+      if (this._sendTransport && !this._dataProducer) {
+        this._dataProducer = await this._sendTransport.produceData({
+          ordered: true,
+          maxPacketLifeTime: undefined,
+          maxRetransmits: undefined,
+          label: 'chat',
+          protocol: '',
+          appData: {},
+        });
+
+        // 디버깅 리스너
+        // 나중에 지워도 됨
+        this._dataProducer.on('open', () => {
+          console.log('[RoomClient] DataProducer open - 채팅 사용 가능');
+        });
+        this._dataProducer.on('close', () => {
+          console.warn('[RoomClient] DataProducer closed');
+        });
+        this._dataProducer.on('error', (err) => {
+          console.error('[RoomClient] DataProducer error:', err);
+        });
+      }
 
       logger.debug('Successfully joined room');
       return peers;
@@ -246,14 +348,18 @@ export default class RoomClient {
   async enableWebcam(): Promise<void> {
     if (this._webcamProducer || !this._mediasoupDevice?.canProduce('video')) return;
 
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    const track = stream.getVideoTracks()[0];
-    this._webcamProducer = await this._sendTransport!.produce({ track });
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const track = stream.getVideoTracks()[0];
+      this._webcamProducer = await this._sendTransport!.produce({ track });
 
-    // ✅ 상태 업데이트 여기서 직접
-    const { setWebcamTrack, setWebcamEnabled } = useRoomStore.getState();
-    setWebcamTrack(track);
-    setWebcamEnabled(true);
+      // ✅ 상태 업데이트 여기서 직접
+      const { setWebcamTrack, setWebcamEnabled } = useRoomStore.getState();
+      setWebcamTrack(track);
+      setWebcamEnabled(true);
+    } catch (error) {
+      console.warn('⚠️ enableWebcam() 실패:', error);
+    }
   }
 
   async disableMic(): Promise<void> {
@@ -277,6 +383,20 @@ export default class RoomClient {
     const { setWebcamTrack, setWebcamEnabled } = useRoomStore.getState();
     setWebcamTrack(null);
     setWebcamEnabled(false);
+  }
+
+  // 메시지 전송
+  async sendChatMessage(messageText: string) {
+    if (!this._dataProducer) {
+      console.warn('[RoomClient] 아직 채널이 연결되지 않았습니다.');
+      return;
+    }
+
+    if (this._dataProducer.readyState === 'open') {
+      this._dataProducer.send(messageText);
+    } else {
+      console.warn('[RoomClient] 아직 채널이 연결되지 않았습니다.');
+    }
   }
 
   get peerId(): string {

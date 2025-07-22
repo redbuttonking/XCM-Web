@@ -1,4 +1,5 @@
 // components/Me.tsx
+import { useState } from 'react';
 import MicVolumeMeter from './MicVolumeMeter';
 import PeerView from './PeerView';
 import { useRoomStore } from '@/store/useRoomStore';
@@ -8,6 +9,7 @@ const Me = () => {
   const webcamTrack = useRoomStore((state) => state.webcamTrack);
   const micEnabled = useRoomStore((state) => state.micEnabled);
   const webcamEnabled = useRoomStore((state) => state.webcamEnabled);
+  const [chatInput, setChatInput] = useState('');
   const roomClient = useRoomStore((state) => state.roomClient);
 
   const toggleMic = async () => {
@@ -38,6 +40,22 @@ const Me = () => {
     }
   };
 
+  const handleSendChat = async () => {
+    if (!chatInput.trim()) return;
+    if (!roomClient) {
+      console.warn('RoomClient가 존재하지 않습니다.');
+      return;
+    }
+
+    try {
+      await roomClient.sendChatMessage(chatInput.trim()); // RoomClient.ts 메서드 호출
+      console.log('[Me.tsx] sendChatMessage 호출 완료');
+      setChatInput('');
+    } catch (err) {
+      console.error('채팅 메시지 전송 오류:', err);
+    }
+  };
+
   return (
     <div className="m-[16px] w-[300px] rounded-lg bg-gray-800 p-2">
       <h2 className="mb-1 text-sm">나</h2>
@@ -52,6 +70,22 @@ const Me = () => {
         >
           {webcamEnabled ? '카메라 끄기' : '카메라 켜기'}
         </button>
+      </div>
+
+      <div>
+        <input
+          className="text-black"
+          type="text"
+          value={chatInput}
+          onChange={(e) => setChatInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              handleSendChat();
+            }
+          }}
+          placeholder="메시지를 입력하세요"
+        />
+        <button onClick={handleSendChat}>전송</button>
       </div>
       {/* <MicVolumeMeter /> */}
     </div>

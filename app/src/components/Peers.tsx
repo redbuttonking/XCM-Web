@@ -86,6 +86,7 @@ const Peers = () => {
 
   // peers의 배열을 15개로 고정
   const fixedPeers = Array.from({ length: totalSlots }).map((_, i) => peers[i] ?? null);
+  console.log('fixedPeers: ', fixedPeers);
 
   return (
     // <div className="grid grid-cols-2 gap-4">

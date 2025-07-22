@@ -8,6 +8,13 @@ export interface PeerInfo {
   audioTrack?: MediaStreamTrack;
 }
 
+export interface Notification {
+  id: string;
+  type: 'chat' | 'error' | 'info';
+  title?: string;
+  text: string;
+}
+
 interface RoomState {
   joined: boolean;
   roomClient: RoomClient | null;
@@ -19,6 +26,7 @@ interface RoomState {
   screenShareEnabled: boolean;
   peers: PeerInfo[];
   peerId: string;
+  notifications: Notification[];
 
   // 상태 업데이트 함수들
   setJoined: (joined: boolean) => void;
@@ -35,6 +43,8 @@ interface RoomState {
   updatePeerTrack: (peerId: string, kind: 'mic' | 'video', track: MediaStreamTrack) => void;
   resetRoom: () => void;
   setPeerId: (peerId: string) => void;
+  addNotification: (notification: Notification) => void;
+  removeNotification: (id: string) => void;
 }
 
 export const useRoomStore = create<RoomState>((set) => ({
@@ -48,6 +58,7 @@ export const useRoomStore = create<RoomState>((set) => ({
   screenTrack: null,
   peers: [],
   peerId: '',
+  notifications: [],
 
   setJoined: (joined) => set({ joined }),
   setMicEnabled: (enabled) => set({ micEnabled: enabled }),
@@ -92,5 +103,15 @@ export const useRoomStore = create<RoomState>((set) => ({
       webcamTrack: null,
       screenTrack: null,
       peers: [],
+      peerId: '',
     }),
+
+  addNotification: (notification) =>
+    set((state) => ({
+      notifications: [...state.notifications, notification],
+    })),
+  removeNotification: (id) =>
+    set((state) => ({
+      notifications: state.notifications.filter((n) => n.id !== id),
+    })),
 }));

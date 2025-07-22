@@ -60,6 +60,11 @@ const AppSidebar = () => {
       url: '/feedbackmanagement',
       icon: <MessagesSquare />,
     },
+    {
+      title: 'Room',
+      url: '/Room',
+      icon: <Monitor />,
+    },
   ];
 
   const screenToolsMenu = [

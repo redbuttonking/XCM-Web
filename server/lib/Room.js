@@ -820,6 +820,7 @@ class Room extends EventEmitter {
    * @async
    */
   async _handleProtooRequest(peer, request, accept, reject) {
+    // console.log("[Room.js] 🔔 Got request.method:", request.method);
     switch (request.method) {
       case "getRouterRtpCapabilities": {
         accept(this._mediasoupRouter.rtpCapabilities);
@@ -828,6 +829,10 @@ class Room extends EventEmitter {
       }
 
       case "join": {
+        console.log(
+          "[Room.js] 🟡 request.data.sctpCapabilities:",
+          request.data.sctpCapabilities
+        );
         // Ensure the Peer is not already joined.
         if (peer.data.joined) throw new Error("Peer already joined");
 
@@ -839,7 +844,15 @@ class Room extends EventEmitter {
         peer.data.displayName = displayName;
         peer.data.device = device;
         peer.data.rtpCapabilities = rtpCapabilities;
+        console.log(
+          "[Room.js] 💾 setting peer.data.sctpCapabilities:",
+          sctpCapabilities
+        );
         peer.data.sctpCapabilities = sctpCapabilities;
+        console.log(
+          "[Room.js] ✅ peer.data.sctpCapabilities now:",
+          peer.data.sctpCapabilities
+        );
 
         // Tell the new Peer about already joined Peers.
         // And also create Consumers for existing Producers.
@@ -877,6 +890,13 @@ class Room extends EventEmitter {
           for (const dataProducer of joinedPeer.data.dataProducers.values()) {
             if (dataProducer.label === "bot") continue;
 
+            if (!peer.data.sctpCapabilities) {
+              console.warn(
+                "[Room.js] ⏳ join 전이라 _createDataConsumer 생략됨 -",
+                peer.id
+              );
+              continue;
+            }
             this._createDataConsumer({
               dataConsumerPeer: peer,
               dataProducerPeer: joinedPeer,
@@ -912,6 +932,8 @@ class Room extends EventEmitter {
 
         const { forceTcp, producing, consuming, sctpCapabilities } =
           request.data;
+
+        peer.data.sctpCapabilities = sctpCapabilities;
 
         const webRtcTransportOptions = {
           ...utils.clone(config.mediasoup.webRtcTransportOptions),
@@ -998,6 +1020,18 @@ class Room extends EventEmitter {
           dtlsParameters: transport.dtlsParameters,
           sctpParameters: transport.sctpParameters,
         });
+
+        if (transport.appData.consuming) {
+          for (const otherPeer of this._getJoinedPeers({ excludePeer: peer })) {
+            for (const dataProducer of otherPeer.data.dataProducers.values()) {
+              this._createDataConsumer({
+                dataConsumerPeer: peer,
+                dataProducerPeer: otherPeer,
+                dataProducer,
+              });
+            }
+          }
+        }
 
         const { maxIncomingBitrate } = config.mediasoup.webRtcTransportOptions;
 
@@ -1550,42 +1584,47 @@ class Room extends EventEmitter {
       }
 
       case "resyncMedia": {
-        // peer가 있는지 확인
         if (!peer.data.joined) throw new Error("Peer not yet joined");
 
-        // 이미 방에 들어와 있는 다른 Peer들의 Producer 정보를 가져옴
         const joinedPeers = [
           ...this._getJoinedPeers(),
           ...this._broadcasters.values(),
         ];
 
         for (const joinedPeer of joinedPeers) {
-          // 자기 자신은 건너뜀
           if (joinedPeer.id === peer.id) continue;
 
-          // 기존 Peer들의 각 Producer에 대해 Consumer를 다시 생성
           for (const producer of joinedPeer.data.producers.values()) {
+            // ✅ 기존 consumer close
+            const consumerId = `${peer.id}-${producer.id}`;
+            const consumer = peer.data.consumers.get(consumerId);
+            if (consumer) {
+              await consumer.close();
+              peer.data.consumers.delete(consumerId);
+            }
+
+            // ✅ 새로운 consumer 생성
             await this._createConsumer({
               consumerPeer: peer,
               producerPeer: joinedPeer,
               producer,
             });
           }
-
+          //  채팅 기능
           //  (선택) DataConsumer도 생성하려면 여기에 추가 가능
           //  나중에 댓글 , 채팅 기능을 쓸 때 사용하면 됨
-          // for (const dataProducer of joinedPeer.data.dataProducers.values()) {
-          //   if (dataProducer.label === "bot") continue;
+          for (const dataProducer of joinedPeer.data.dataProducers.values()) {
+            if (dataProducer.label === "bot") continue;
 
-          //   await this._createDataConsumer({
-          //     dataConsumerPeer: peer,
-          //     dataProducerPeer: joinedPeer,
-          //     dataProducer,
-          //   });
-          // }
+            await this._createDataConsumer({
+              dataConsumerPeer: peer,
+              dataProducerPeer: joinedPeer,
+              dataProducer,
+            });
+          }
         }
 
-        accept(); // 응답 반환
+        accept();
         break;
       }
 
@@ -1793,17 +1832,24 @@ class Room extends EventEmitter {
     dataProducer,
   }) {
     // NOTE: Don't create the DataConsumer if the remote Peer cannot consume it.
-    if (!dataConsumerPeer.data.sctpCapabilities) return;
+    // if (!dataConsumerPeer.data.sctpCapabilities) return;
 
     // Must take the Transport the remote Peer is using for consuming.
     const transport = Array.from(
       dataConsumerPeer.data.transports.values()
     ).find((t) => t.appData.consuming);
 
-    // This should not happen.
-    if (!transport) {
-      logger.warn("_createDataConsumer() | Transport for consuming not found");
+    // // This should not happen.
+    // if (!transport) {
+    //   logger.warn("_createDataConsumer() | Transport for consuming 없음");
 
+    //   return;
+    // }
+
+    if (!dataConsumerPeer.data.sctpCapabilities || !transport) {
+      console.warn(
+        `[Room.js] ⏳ skip _createDataConsumer → 조건 미충족 (peerId: ${dataConsumerPeer.id})`
+      );
       return;
     }
 
@@ -1840,6 +1886,7 @@ class Room extends EventEmitter {
 
     // Send a protoo request to the remote Peer with Consumer parameters.
     try {
+      console.log('📤 sending "newDataConsumer" to peer:', dataConsumerPeer.id);
       await dataConsumerPeer.request("newDataConsumer", {
         // This is null for bot DataProducer.
         peerId: dataProducerPeer ? dataProducerPeer.id : null,
