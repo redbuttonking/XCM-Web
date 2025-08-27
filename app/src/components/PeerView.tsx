@@ -124,21 +124,33 @@ const PeerView = ({ videoTrack, audioTrack }: PeerViewProps) => {
   }, [videoTrack?.id, videoTrack?.muted]);
 
   return (
+    // <>
+    //   {videoTrack && videoTrack.muted ? (
+    //     <div className="aspect-video w-full rounded-lg bg-black object-cover text-center">
+    //       📛 일시 중단
+    //     </div>
+    //   ) : (
+    //     <video
+    //       ref={videoRef}
+    //       autoPlay
+    //       playsInline
+    //       // muted={false}
+    //       muted
+    //       className="aspect-video w-full rounded-lg bg-black object-cover"
+    //     />
+    //   )}
+    //   <audio ref={audioRef} autoPlay />
+    // </>
     <>
-      {videoTrack && videoTrack.muted ? (
-        <div className="aspect-video w-full rounded-lg bg-black object-cover text-center">
-          📛 일시 중단
-        </div>
-      ) : (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          // muted={false}
-          muted
-          className="aspect-video w-full rounded-lg bg-black object-cover"
-        />
-      )}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        // muted={false}
+        muted
+        className="aspect-video w-full rounded-lg bg-black object-cover"
+      />
+
       <audio ref={audioRef} autoPlay />
     </>
   );

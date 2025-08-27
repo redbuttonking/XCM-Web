@@ -2,7 +2,7 @@
 
 // RoomClient.ts
 import * as mediasoupClient from 'mediasoup-client';
-
+// import type { EnhancedEventEmitter } from 'mediasoup-client/lib/EnhancedEventEmitter';
 import protooClient from 'protoo-client';
 import { getProtooUrl } from '@/core/urlFactory';
 import Logger from '@/lib/Logger';
@@ -16,6 +16,8 @@ interface RoomClientOptions {
   displayName: string;
   forceTcp?: boolean;
 }
+
+type MaybeLabel = string | { label?: string; value?: string } | null | undefined;
 
 export default class RoomClient {
   private _roomId: string;
@@ -33,6 +35,11 @@ export default class RoomClient {
   private _webcamProducer: mediasoupClient.types.Producer | null = null;
 
   private _dataProducer: mediasoupClient.types.DataProducer | null = null;
+
+  private _peerDataChannels: Record<string, RTCDataChannel> = {};
+  private _registerPeerDataChannel(peerId: string, dataChannel: RTCDataChannel) {
+    this._peerDataChannels[peerId] = dataChannel;
+  }
 
   constructor({ roomId, peerId, displayName, forceTcp = false }: RoomClientOptions) {
     this._roomId = roomId;
@@ -92,7 +99,7 @@ export default class RoomClient {
           request.data;
 
         try {
-          const dataConsumer = await this._recvTransport!.consumeData({
+          const rawConsumer = await this._recvTransport!.consumeData({
             id,
             dataProducerId,
             sctpStreamParameters,
@@ -101,18 +108,29 @@ export default class RoomClient {
             appData,
           });
 
+          // mediasoup-client 에서 DataConsumer 타입을 제대로 명시하지 않음
+          // this._registerPeerDataChannel(peerId, dataConsumer);
+
+          // 그래서 타입 가드 + 타입 좁히기
+          if ('dataChannel' in rawConsumer) {
+            const dataConsumer = rawConsumer as { dataChannel: RTCDataChannel };
+            this._registerPeerDataChannel(peerId, dataConsumer.dataChannel);
+          } else {
+            console.warn('⚠️ dataChannel 속성이 존재하지 않음 — peer:', peerId);
+          }
+
           console.log(`[RoomClient] ✅ DataConsumer created from peer ${peerId}`);
 
-          dataConsumer.on('open', () => {
+          rawConsumer.on('open', () => {
             console.log(`[RoomClient] 📡 DataConsumer open: ${label}`);
           });
 
-          dataConsumer.on('message', (message: string | Buffer) => {
+          rawConsumer.on('message', (message: string | Buffer) => {
             const text = typeof message === 'string' ? message : new TextDecoder().decode(message);
             console.log(`[RoomClient] 💬 메시지 수신 from ${peerId}:`, text);
           });
 
-          dataConsumer.on('close', () => {
+          rawConsumer.on('close', () => {
             console.warn('[RoomClient] ❌ DataConsumer closed');
           });
 
@@ -385,18 +403,137 @@ export default class RoomClient {
     setWebcamEnabled(false);
   }
 
-  // 메시지 전송
-  async sendChatMessage(messageText: string) {
-    if (!this._dataProducer) {
-      console.warn('[RoomClient] 아직 채널이 연결되지 않았습니다.');
-      return;
-    }
+  // DataChannel이 open 될 때까지 기다림 (타임아웃 포함)
+  private async _waitForDataChannelOpen(timeoutMs = 7000): Promise<void> {
+    const dp = this._dataProducer;
+    if (!dp) throw new Error('DataProducer not created yet');
+    if (dp.readyState === 'open') return;
 
-    if (this._dataProducer.readyState === 'open') {
-      this._dataProducer.send(messageText);
-    } else {
-      console.warn('[RoomClient] 아직 채널이 연결되지 않았습니다.');
+    await new Promise<void>((resolve, reject) => {
+      const onOpen = () => {
+        cleanup();
+        resolve();
+      };
+      const onClose = () => {
+        cleanup();
+        reject(new Error('DataChannel closed'));
+      };
+      const onError = (e: any) => {
+        cleanup();
+        reject(e instanceof Error ? e : new Error(String(e)));
+      };
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error('open timeout'));
+      }, timeoutMs);
+
+      const cleanup = () => {
+        clearTimeout(timer);
+        dp.off('open', onOpen);
+        dp.off('close', onClose);
+        dp.off('error', onError);
+      };
+
+      dp.on('open', onOpen);
+      dp.on('close', onClose);
+      dp.on('error', onError);
+    });
+  }
+
+  // open 대기 → 전송까지 한 번에
+  private async _sendOverDcAsync(text: string, timeoutMs = 7000): Promise<boolean> {
+    try {
+      await this._waitForDataChannelOpen(timeoutMs);
+      this._dataProducer!.send(text);
+      return true;
+    } catch (e) {
+      console.warn('[RoomClient] DC send failed:', e);
+      return false;
     }
+  }
+
+  // 메시지 전송
+  async sendChatMessage(messageText: string): Promise<boolean> {
+    return this._sendOverDcAsync(messageText);
+  }
+
+  // 메시지 전송(peer 선택)
+  async sendChatMessageToPeers(targetPeerIds: string[], text: string): Promise<boolean> {
+    return this._sendOverDcAsync(
+      JSON.stringify({
+        type: 'chat',
+        targetPeerIds,
+        text,
+      }),
+    );
+  }
+
+  // 설치 명령 (install_apk)
+  async sendInstallApk(targetPeerIds: string[], apkName: string, apkUrl: string): Promise<boolean> {
+    return this._sendOverDcAsync(
+      JSON.stringify({ type: 'install_apk', apkName, apkUrl, targetPeerIds }),
+    );
+  }
+  // 대상 peer에게 mp3 파일명으로 재생
+  async sendAudioPlayByName(
+    targetPeerIds: string[],
+    filename: string,
+    title?: string,
+  ): Promise<boolean> {
+    return this._sendOverDcAsync(
+      JSON.stringify({ type: 'play_audio', targetPeerIds, filename, title }),
+    );
+  }
+
+  // 대상 peer에게 URI로 재생
+  async sendAudioPlayByUri(targetPeerIds: string[], uri: string, title?: string): Promise<boolean> {
+    return this._sendOverDcAsync(JSON.stringify({ type: 'play_audio', targetPeerIds, uri, title }));
+  }
+
+  // 대상 peer에게 정지
+  async sendAudioStop(targetPeerIds: string[]): Promise<boolean> {
+    return this._sendOverDcAsync(JSON.stringify({ type: 'stop_audio', targetPeerIds }));
+  }
+
+  // 대상 peer에게 앱 실행
+  // async sendLaunchApp(
+  //   targetPeerIds: string[],
+  //   opts: { pkg?: string; label?: string; apkName?: string; activity?: string },
+  // ): Promise<boolean> {
+  //   if (!targetPeerIds?.length) throw new Error('No target peers');
+  //   const payload = {
+  //     type: 'launch_app',
+  //     targetPeerIds,
+  //     ...(opts.pkg ? { pkg: opts.pkg } : {}),
+  //     ...(opts.label ? { label: opts.label } : {}),
+  //     ...(opts.apkName ? { apkName: opts.apkName } : {}),
+  //     ...(opts.activity ? { activity: opts.activity } : {}),
+  //   };
+  //   return this._sendOverDcAsync(JSON.stringify(payload));
+  // }
+  async sendLaunchApp(
+    targetPeerIds: string[],
+    opts: { pkg?: string; label?: MaybeLabel; apkName?: string; activity?: string },
+  ): Promise<boolean> {
+    if (!targetPeerIds?.length) throw new Error('No target peers');
+
+    // ✅ 라벨 정규화 (문자열만 남김)
+    const labelStr =
+      typeof opts.label === 'string'
+        ? opts.label.trim()
+        : (opts.label?.label ?? opts.label?.value ?? '').toString().trim();
+
+    const payload = {
+      type: 'launch_app',
+      targetPeerIds,
+      ...(labelStr ? { label: labelStr } : {}),
+      ...(opts.pkg?.trim() ? { pkg: opts.pkg.trim() } : {}),
+      ...(opts.apkName?.trim() ? { apkName: opts.apkName.trim() } : {}),
+      ...(opts.activity?.trim() ? { activity: opts.activity.trim() } : {}),
+    };
+
+    console.log('[sendLaunchApp] payload:', payload); // 디버깅용
+    return this._sendOverDcAsync(JSON.stringify(payload));
   }
 
   get peerId(): string {

@@ -2,21 +2,20 @@
 import { useRoomStore } from '@/store/useRoomStore';
 import Peer from './Peer';
 import EmptySlot from './EmptySlot';
+import { useEffect, useMemo } from 'react';
 
 const Peers = () => {
-  // const myPeerId = useRoomStore.getState(); // RoomClient 생성 시 저장된 내 ID
-  // const peers = useRoomStore(
-  //   (state) => state.peers.filter((peer) => peer.id !== myPeerId.roomClient._peerId), // ✅ 내 peer는 제외
-  // );
+  // peers의 배열을 15개로 고정
+  const totalSlots = 15;
 
   // UI 작업 후 주석 제거
   const allPeers = useRoomStore((state) => state.peers);
-  const peerId = useRoomStore((state) => state.peerId);
-  const peers = allPeers.filter((peer) => peer.id !== peerId);
+  const myPeerId = useRoomStore((state) => state.peerId);
 
-  // peer 가 없을 때 Ui (text만 나옴)
-  // if (peers.length === 0)
-  //   return <div className="text-center text-gray-400">다른 참가자가 없습니다</div>;
+  // 내 자신 제외한 peers 계산을 메모이즈
+  const peers = useMemo(() => {
+    return allPeers.filter((peer) => peer.id !== myPeerId);
+  }, [allPeers, myPeerId]);
 
   // Ui 목데이터
   // const peers = [
@@ -82,31 +81,16 @@ const Peers = () => {
   //   },
   // ];
 
-  const totalSlots = 15;
+  const fixedPeers = useMemo(() => {
+    return Array.from({ length: totalSlots }, (_, i) => peers[i] ?? null);
+  }, [peers]);
 
-  // peers의 배열을 15개로 고정
-  const fixedPeers = Array.from({ length: totalSlots }).map((_, i) => peers[i] ?? null);
-  console.log('fixedPeers: ', fixedPeers);
+  useEffect(() => {
+    console.log('fixedPeers:', fixedPeers);
+  }, [fixedPeers]);
 
   return (
-    // <div className="grid grid-cols-2 gap-4">
-    //   {peers.map((peer) => (
-    //     <div key={peer.id}>
-    //       <div>{peer.id}</div>
-    //       <Peer key={peer.id} peer={peer} />
-    //     </div>
-    //   ))}
-    // </div>
-
-    // UI 스타일링 목업 코드
     <div className="grid grid-cols-5 gap-4">
-      {/* {peers.map((peer) => (
-        <div key={peer.id}>
-          <div>{peer.id}</div>
-          <Peer key={peer.id} peer={peer} />
-        </div>
-      ))} */}
-
       {fixedPeers.map((peer, index) => (
         <div key={index}>
           {peer ? (

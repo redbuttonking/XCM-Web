@@ -46,6 +46,7 @@ interface RoomState {
   addNotification: (notification: Notification) => void;
   removeNotification: (id: string) => void;
 }
+export type { RoomState };
 
 export const useRoomStore = create<RoomState>((set) => ({
   joined: false,

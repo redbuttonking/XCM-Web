@@ -116,7 +116,7 @@ module.exports = {
         {
           protocol: "udp",
           ip: process.env.MEDIASOUP_LISTEN_IP || "0.0.0.0",
-          announcedAddress: "192.168.0.7", //회사 와이파이,
+          announcedAddress: "192.168.0.10", //회사 와이파이,
           // announcedAddress: '192.168.161.50', // 핫스팟,
           // 기존 demo코드
           // announcedAddress: process.env.MEDIASOUP_ANNOUNCED_IP,
@@ -126,7 +126,7 @@ module.exports = {
           protocol: "tcp",
           ip: process.env.MEDIASOUP_LISTEN_IP || "0.0.0.0",
           // 기존 demoo코드
-          announcedAddress: "192.168.0.7", //회사 와이파이,
+          announcedAddress: "192.168.0.10", //회사 와이파이,
           // announcedAddress: '192.168.78.50' //핫스팟,
           // 기존 demo코드
           // announcedAddress: process.env.MEDIASOUP_ANNOUNCED_IP,
@@ -144,7 +144,7 @@ module.exports = {
         {
           protocol: "udp",
           ip: process.env.MEDIASOUP_LISTEN_IP || "0.0.0.0",
-          announcedAddress: "192.168.0.7",
+          announcedAddress: "192.168.0.10",
           // announcedAddress: process.env.MEDIASOUP_ANNOUNCED_IP,
           portRange: {
             min: process.env.MEDIASOUP_MIN_PORT || 40000,
@@ -154,7 +154,7 @@ module.exports = {
         {
           protocol: "tcp",
           ip: process.env.MEDIASOUP_LISTEN_IP || "0.0.0.0",
-          announcedAddress: "192.168.0.7",
+          announcedAddress: "192.168.0.10",
           // announcedAddress: process.env.MEDIASOUP_ANNOUNCED_IP,
           portRange: {
             min: process.env.MEDIASOUP_MIN_PORT || 40000,
@@ -175,7 +175,7 @@ module.exports = {
       listenInfo: {
         protocol: "udp",
         ip: process.env.MEDIASOUP_LISTEN_IP || "0.0.0.0",
-        announcedAddress: "192.168.0.7",
+        announcedAddress: "192.168.0.10",
         // 기존 demo 코드
         // announcedAddress: process.env.MEDIASOUP_ANNOUNCED_IP,
         portRange: {

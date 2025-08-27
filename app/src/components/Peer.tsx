@@ -1,5 +1,5 @@
 // components/Peer.tsx
-import { useRoomStore, type PeerInfo } from '@/store/useRoomStore';
+import { type PeerInfo } from '@/store/useRoomStore';
 import PeerView from './PeerView';
 
 interface PeerProps {
