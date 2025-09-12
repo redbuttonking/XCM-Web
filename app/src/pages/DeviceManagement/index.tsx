@@ -1,7 +1,7 @@
 const DeviceManagement = () => {
   return (
     <>
-      <div>기기관리 페이지</div>
+      <h2 className="pb-[40px] text-2xl font-bold text-black">Device Management</h2>
     </>
   );
 };

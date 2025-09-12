@@ -1,15 +1,38 @@
 import { useEffect, useRef } from 'react';
 import { useRoomStore } from '@/store/useRoomStore';
+import ViewPointers from '../pages/Monitoring/components/ViewPointers';
 
 interface PeerViewProps {
+  peerId?: string;
   videoTrack?: MediaStreamTrack;
   audioTrack?: MediaStreamTrack;
+  variant?: 'multiple' | 'fill';
+
+  activeMode?: 'none' | 'message' | 'audio' | 'install' | 'Launch' | 'record' | 'viewGuide';
+  setActiveMode?: (
+    mode: 'none' | 'message' | 'audio' | 'install' | 'Launch' | 'record' | 'viewGuide',
+  ) => void;
 }
 
-const PeerView = ({ videoTrack, audioTrack }: PeerViewProps) => {
+const PeerView = ({
+  peerId,
+  videoTrack,
+  audioTrack,
+  variant = 'multiple',
+  activeMode,
+  setActiveMode,
+}: PeerViewProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const prevVideoTrackId = useRef<string | null>(null);
+
+  // ✅ 반응형 비디오 클래스 적용
+  const wrapCls = variant === 'fill' ? 'relative w-full max-w-full' : ' w-full';
+  const videoCls =
+    variant === 'fill'
+      ? // ✅ 단일 모니터링일 경우
+        'block w-full h-auto max-h-full object-contain bg-black rounded-xl'
+      : // 다중 모니터링일 경우
+        'block w-full aspect-video object-cover bg-black rounded-xl';
 
   // 비디오 트랙 처리
   useEffect(() => {
@@ -86,6 +109,9 @@ const PeerView = ({ videoTrack, audioTrack }: PeerViewProps) => {
     const audioElement = audioRef.current;
     if (!audioTrack || !audioElement) return;
 
+    console.log('[PeerView] 🔄 새로운 audioTrack 감지:', audioTrack.id);
+    console.log('audioTrack: ', audioTrack);
+
     const stream = new MediaStream([audioTrack]);
     audioElement.srcObject = stream;
 
@@ -124,35 +150,18 @@ const PeerView = ({ videoTrack, audioTrack }: PeerViewProps) => {
   }, [videoTrack?.id, videoTrack?.muted]);
 
   return (
-    // <>
-    //   {videoTrack && videoTrack.muted ? (
-    //     <div className="aspect-video w-full rounded-lg bg-black object-cover text-center">
-    //       📛 일시 중단
-    //     </div>
-    //   ) : (
-    //     <video
-    //       ref={videoRef}
-    //       autoPlay
-    //       playsInline
-    //       // muted={false}
-    //       muted
-    //       className="aspect-video w-full rounded-lg bg-black object-cover"
-    //     />
-    //   )}
-    //   <audio ref={audioRef} autoPlay />
-    // </>
-    <>
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        // muted={false}
-        muted
-        className="aspect-video w-full rounded-lg bg-black object-cover"
-      />
-
+    <div className={wrapCls}>
+      <video ref={videoRef} autoPlay playsInline muted className={videoCls} />
       <audio ref={audioRef} autoPlay />
-    </>
+
+      {variant === 'fill' && setActiveMode && activeMode && (
+        <>
+          {activeMode === 'viewGuide' && (
+            <ViewPointers peerId={peerId} onCancel={() => setActiveMode('none')} />
+          )}
+        </>
+      )}
+    </div>
   );
 };
 

@@ -40,7 +40,7 @@ interface RoomState {
   setPeers: (peers: PeerInfo[]) => void;
   addPeer: (peer: PeerInfo) => void;
   removePeer: (peerId: string) => void;
-  updatePeerTrack: (peerId: string, kind: 'mic' | 'video', track: MediaStreamTrack) => void;
+  updatePeerTrack: (peerId: string, kind: 'audio' | 'video', track: MediaStreamTrack) => void;
   resetRoom: () => void;
   setPeerId: (peerId: string) => void;
   addNotification: (notification: Notification) => void;

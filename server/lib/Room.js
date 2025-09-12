@@ -1594,32 +1594,41 @@ class Room extends EventEmitter {
         for (const joinedPeer of joinedPeers) {
           if (joinedPeer.id === peer.id) continue;
 
+          // 동일 producer 소비중인 기존 consumer 정리
           for (const producer of joinedPeer.data.producers.values()) {
-            // ✅ 기존 consumer close
-            const consumerId = `${peer.id}-${producer.id}`;
-            const consumer = peer.data.consumers.get(consumerId);
-            if (consumer) {
-              await consumer.close();
-              peer.data.consumers.delete(consumerId);
+            for (const c of peer.data.consumers.values()) {
+              if (c.producerId === producer.id) {
+                try {
+                  c.close();
+                } catch {}
+                peer.data.consumers.delete(c.id);
+              }
             }
-
-            // ✅ 새로운 consumer 생성
             await this._createConsumer({
               consumerPeer: peer,
               producerPeer: joinedPeer,
               producer,
             });
           }
-          //  채팅 기능
-          //  (선택) DataConsumer도 생성하려면 여기에 추가 가능
-          //  나중에 댓글 , 채팅 기능을 쓸 때 사용하면 됨
-          for (const dataProducer of joinedPeer.data.dataProducers.values()) {
-            if (dataProducer.label === "bot") continue;
 
+          // DataConsumer도 중복 제거 후 재생성 (dataProducerId는 필요 시 appData로 저장)
+          for (const dp of joinedPeer.data.dataProducers.values()) {
+            if (dp.label === "bot") continue;
+            for (const dc of peer.data.dataConsumers.values()) {
+              if (
+                dc.dataProducerId === dp.id ||
+                dc.appData?.dataProducerId === dp.id
+              ) {
+                try {
+                  dc.close();
+                } catch {}
+                peer.data.dataConsumers.delete(dc.id);
+              }
+            }
             await this._createDataConsumer({
               dataConsumerPeer: peer,
               dataProducerPeer: joinedPeer,
-              dataProducer,
+              dataProducer: dp,
             });
           }
         }

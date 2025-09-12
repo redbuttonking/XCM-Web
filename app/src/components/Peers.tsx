@@ -2,9 +2,15 @@
 import { useRoomStore } from '@/store/useRoomStore';
 import Peer from './Peer';
 import EmptySlot from './EmptySlot';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
-const Peers = () => {
+interface PeersProps {
+  selectedPeers: string[];
+  onChange: (selectedPeers: string[]) => void;
+  recordingPeers: Record<string, boolean>; // 녹화중인지 확인하는 상태 값
+}
+
+const Peers = ({ selectedPeers, onChange, recordingPeers }: PeersProps) => {
   // peers의 배열을 15개로 고정
   const totalSlots = 15;
 
@@ -16,6 +22,18 @@ const Peers = () => {
   const peers = useMemo(() => {
     return allPeers.filter((peer) => peer.id !== myPeerId);
   }, [allPeers, myPeerId]);
+
+  // 선택된 peer id 배열
+  // const [selectedPeers, setSelectedPeers] = useState<string[]>([]);
+
+  // peer 선택 / 해제 함수
+  const togglePeer = (peerId: string) => {
+    if (selectedPeers.includes(peerId)) {
+      onChange(selectedPeers.filter((id) => id !== peerId));
+    } else {
+      onChange([...selectedPeers, peerId]);
+    }
+  };
 
   // Ui 목데이터
   // const peers = [
@@ -86,15 +104,25 @@ const Peers = () => {
   }, [peers]);
 
   useEffect(() => {
-    console.log('fixedPeers:', fixedPeers);
+    console.log('확인 fixedPeers:', fixedPeers);
   }, [fixedPeers]);
 
+  // peer가 잘 선택됐는지 확인
+  useEffect(() => {
+    console.log('선택된 peer : ', selectedPeers);
+  }, [selectedPeers]);
   return (
-    <div className="grid grid-cols-5 gap-4">
+    <div className="grid grid-cols-5 gap-4 font-bold">
       {fixedPeers.map((peer, index) => (
         <div key={index}>
           {peer ? (
-            <Peer peer={peer} />
+            <Peer
+              key={peer.id}
+              peer={peer}
+              selected={selectedPeers.includes(peer.id)}
+              onToggle={() => togglePeer(peer.id)}
+              isRecording={!!recordingPeers[peer.id]}
+            />
           ) : (
             // 빈 자리일 때의 placeholder UI
             <EmptySlot />

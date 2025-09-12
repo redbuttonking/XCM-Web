@@ -1,9 +1,9 @@
 import { useState } from 'react';
 
-const AudioPlayForm = ({ peerIds, sendJson }: AudioPlayFormProps) => {
+const AudioPlayForm = ({ peerIds, sendJson, onCancel }: AudioPlayFormProps) => {
   const [filename, setFilename] = useState('');
   const [contentUri, setContentUri] = useState('');
-  const [title, setTitle] = useState('오디오 재생 중'); // 상단바에서 띄울 알림 제목
+  const [title, setTitle] = useState('오디오 재생 중');
 
   const handlePlay = () => {
     if (peerIds.length === 0) {
@@ -55,37 +55,67 @@ const AudioPlayForm = ({ peerIds, sendJson }: AudioPlayFormProps) => {
   };
 
   return (
-    <div>
-      <div className="text-black">오디오 재생</div>
-      <input
-        type="text"
-        value={filename}
-        onChange={(e) => setFilename(e.target.value)}
-        placeholder="파일명 (예: sample.mp3)"
-        className="w-full border p-2 text-black"
-      />
-      <div className="text-black">또는</div>
-      <input
-        type="text"
-        value={contentUri}
-        onChange={(e) => setContentUri(e.target.value)}
-        placeholder="Content URI (선택, 예: content://.../audio/media/123)"
-        className="w-full border p-2 text-black"
-      />
-      <input
-        type="text"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="알림 제목 (선택)"
-        className="w-full border p-2 text-black"
-      />
-      <div className="text-black">선택된 Peer 수 : {peerIds.length}</div>
-      <button className="mr-[10px] rounded bg-blue px-4 py-2 text-white" onClick={handlePlay}>
-        재생
-      </button>
-      <button className="rounded bg-blue px-4 py-2 text-white" onClick={handleStop}>
-        정지
-      </button>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+      onClick={onCancel}
+    >
+      <div
+        className="mx-4 w-full max-w-lg rounded-lg bg-white p-6 shadow-lg"
+        onClick={(e) => e.stopPropagation()} // 모달 내부 클릭 이벤트 배경 전파 차단
+      >
+        <h2 className="mb-4 text-xl font-semibold text-black">오디오 재생</h2>
+
+        <input
+          type="text"
+          value={filename}
+          onChange={(e) => setFilename(e.target.value)}
+          placeholder="파일명 (예: sample.mp3)"
+          className="mb-3 w-full rounded border border-gray-300 p-3 text-black focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+        {/* URI로 재생시키는 input */}
+        {/* <div className="mb-3 text-center font-semibold text-black">또는</div>
+        <input
+          type="text"
+          value={contentUri}
+          onChange={(e) => setContentUri(e.target.value)}
+          placeholder="Content URI (예: content://.../audio/media/123)"
+          className="mb-3 w-full rounded border border-gray-300 p-3 text-black focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        /> */}
+        {/* 오디오 재생시 알림 제목 지정하는 input *기본값은 오디오 재생중 */}
+        {/* <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="알림 제목 (선택)"
+          className="mb-5 w-full rounded border border-gray-300 p-3 text-black focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        /> */}
+
+        <div className="flex justify-end space-x-4">
+          <button
+            type="button"
+            className="rounded border bg-white px-5 py-2 text-gray-200"
+            onClick={onCancel}
+          >
+            취소
+          </button>
+
+          <button
+            type="button"
+            className="rounded bg-[#3A589F] px-5 py-2 text-white"
+            onClick={handlePlay}
+          >
+            재생
+          </button>
+
+          {/* <button
+            type="button"
+            className="hover:bg-red-700 rounded bg-red px-5 py-2 text-white"
+            onClick={handleStop}
+          >
+            정지
+          </button> */}
+        </div>
+      </div>
     </div>
   );
 };
@@ -118,4 +148,5 @@ type AudioCommandPayload = PlayByUriPayload | PlayByFilenamePayload | StopAudioP
 type AudioPlayFormProps = {
   peerIds: string[];
   sendJson: (payload: AudioCommandPayload) => Promise<void> | void;
+  onCancel: () => void; // 모달 닫기용 콜백
 };

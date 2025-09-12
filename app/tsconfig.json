@@ -6,10 +6,10 @@
     "allowSyntheticDefaultImports": true,
     "allowJs": true,
     "moduleResolution": "node",
-    "baseUrl": "./", 
+    "baseUrl": "./",
     "paths": {
       "@/*": ["src/*"] // ✅ 경로 alias
     },
-    "types": ["react", "node"]
+    "types": ["dom", "react", "node"]
   }
 }

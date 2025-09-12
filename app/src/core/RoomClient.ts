@@ -160,7 +160,7 @@ export default class RoomClient {
       }
       // 임시로 웹켐 주석 처리
       //  방에 입장 완료 후 내 미디어 자동 연결 (카메라 on , 마이크 off)
-      // await this.enableMic();
+      await this.enableMic();
       // await this.enableWebcam();
 
       // room 입장시 상대 peer 미디어 연결
@@ -511,6 +511,7 @@ export default class RoomClient {
   //   };
   //   return this._sendOverDcAsync(JSON.stringify(payload));
   // }
+
   async sendLaunchApp(
     targetPeerIds: string[],
     opts: { pkg?: string; label?: MaybeLabel; apkName?: string; activity?: string },
@@ -534,6 +535,22 @@ export default class RoomClient {
 
     console.log('[sendLaunchApp] payload:', payload); // 디버깅용
     return this._sendOverDcAsync(JSON.stringify(payload));
+  }
+
+  // 대상 peer 에게 뷰 가이드 전송
+  async sendPointingAudio(
+    targetPeerIds: string[],
+    filename: string,
+    title?: string,
+  ): Promise<boolean> {
+    return this._sendOverDcAsync(
+      JSON.stringify({
+        type: 'play_pointing',
+        targetPeerIds,
+        filename,
+        title,
+      }),
+    );
   }
 
   get peerId(): string {
