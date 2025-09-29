@@ -8,6 +8,7 @@ import { Search, X } from 'lucide-react';
 import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import DetailPane from './components/DetailPane';
+import FilterSelect from '@/components/FilterSelect';
 
 const RecordingManagement = () => {
   const [folderHandle, setFolderHandle] = useState<FileSystemDirectoryHandle | null>(null);
@@ -40,7 +41,7 @@ const RecordingManagement = () => {
       return;
     }
 
-    const ok = confirm(`선택한 ${selected.length}개의 파일을 실제로 삭제하시겠습니까?`);
+    const ok = confirm(`선택한 ${selected.length}개의 파일을 삭제하시겠습니까?`);
     if (!ok) return;
 
     // 쓰기 권한 요청
@@ -164,7 +165,15 @@ const RecordingManagement = () => {
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3 md:gap-4">
                 <div className="flex min-w-0 flex-1 items-center gap-3">
                   <SearchBar value={query} onChange={setQuery} onClear={() => setQuery('')} />
-                  <FileTypeDropdown options={initialTypes} value={filter} onChange={setFilter} />
+                  {/* <FileTypeDropdown options={initialTypes} value={filter} onChange={setFilter} /> */}
+                  <FilterSelect
+                    options={initialTypes}
+                    value={filter}
+                    onChange={setFilter}
+                    placeholder="파일 유형"
+                    triggerWidthClass="w-[180px]" // 필요에 따라 폭만 다르게
+                    className="h-[44px] border-gray-300 bg-white/90 text-gray-800 backdrop-blur hover:bg-white focus-visible:ring-1 focus-visible:ring-gray-300"
+                  />
                 </div>
 
                 <div className="flex items-center gap-2">

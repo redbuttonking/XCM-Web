@@ -12,7 +12,7 @@ window.BOWSER = bowser;
 export interface DeviceInfo {
   flag: string;
   name: string;
-  version: string;
+  version?: string;
 }
 
 export default function getDeviceInfo(): DeviceInfo {

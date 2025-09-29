@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Headphones,
   Download,
@@ -8,34 +8,42 @@ import {
   Mail,
   RotateCcw,
   Binoculars,
+  Scan,
 } from 'lucide-react';
 import { useRecordingMultiStore } from '@/store/useRecordingMultiStore';
 import PanelButton from './PanelButton';
+import { useRoomStore } from '@/store/useRoomStore';
 
 interface ControlPanelProps {
   selectedPeers: string[];
+  focusedPeer?: string;
   onSetActiveMode: (mode: 'message' | 'audio' | 'install' | 'Launch' | 'viewGuide') => void;
   onStartRecording: () => void;
   onStopRecording: () => void;
   onMediaReconnect: () => void;
+  onSinglePeerCapture?: (peerId: string) => Promise<void>;
   showViewGuideButton?: boolean;
 }
 
 const ControlPanel = ({
   selectedPeers,
+  focusedPeer,
   onSetActiveMode,
   onStartRecording,
   onStopRecording,
   onMediaReconnect,
+  onSinglePeerCapture,
   showViewGuideButton = false,
 }: ControlPanelProps) => {
   // zustand 프리미티브 selector: sessions만 가져옴
-  const sessions = useRecordingMultiStore((state) => state.sessions);
+  const recordingSessions = useRecordingMultiStore((state) => state.sessions);
 
-  // peer 녹화 상태 배열은 useMemo로 안정적으로 관리
+  const isSingleMonitoring = !!focusedPeer;
+
+  // peer 녹화 상태 배열은 useMemo로 관리
   const recordingStates = useMemo(
-    () => selectedPeers.map((peerId) => sessions[peerId]?.isRecording ?? false),
-    [sessions, selectedPeers],
+    () => selectedPeers.map((peerId) => recordingSessions[peerId]?.isRecording ?? false),
+    [recordingSessions, selectedPeers],
   );
 
   const hasSelection = selectedPeers.length > 0;
@@ -46,17 +54,10 @@ const ControlPanel = ({
   // 버튼 disabled 상태 계산
   const startDisabled = !hasSelection || !noneRecording || mixedRecording;
   const stopDisabled = !hasSelection || !allRecording || mixedRecording;
+
   return (
     <div className="flex w-full max-w-[800px] flex-col items-center text-center">
       <div className="flex flex-wrap items-center justify-center gap-2 rounded-2xl border-2 border-[#A5A5A5] bg-white px-3 py-3 shadow">
-        {/* 메시지 보내기 */}
-        <PanelButton
-          icon={<Mail />}
-          label="메시지"
-          disabled={!hasSelection}
-          onClick={() => onSetActiveMode('message')}
-        />
-
         {/* 오디오 실행하기 */}
         {/* <PanelButton
           icon={<Headphones />}
@@ -71,6 +72,14 @@ const ControlPanel = ({
             icon={<Binoculars />}
             label="뷰가이드"
             onClick={() => onSetActiveMode('viewGuide')}
+          />
+        )}
+
+        {isSingleMonitoring && (
+          <PanelButton
+            icon={<Scan />}
+            label={'화면 캡처'}
+            onClick={() => onSinglePeerCapture?.(focusedPeer)}
           />
         )}
 

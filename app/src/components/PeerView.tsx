@@ -4,8 +4,8 @@ import ViewPointers from '../pages/Monitoring/components/ViewPointers';
 
 interface PeerViewProps {
   peerId?: string;
-  videoTrack?: MediaStreamTrack;
-  audioTrack?: MediaStreamTrack;
+  videoTrack?: MediaStreamTrack | null;
+  audioTrack?: MediaStreamTrack | null;
   variant?: 'multiple' | 'fill';
 
   activeMode?: 'none' | 'message' | 'audio' | 'install' | 'Launch' | 'record' | 'viewGuide';
@@ -34,6 +34,14 @@ const PeerView = ({
       : // 다중 모니터링일 경우
         'block w-full aspect-video object-cover bg-black rounded-xl';
 
+  // zustand에서 해당 peer consumer 상태 조회: 'paused' | 'resumed' 등
+  // const peers = useRoomStore((state) => state.peers);
+
+  // const peerInfo = peers.find((p) => p.id === peerId);
+  // console.log('peerInfo: ', peerInfo);
+
+  // const consumerState = peerInfo?.audioConsumerState ?? 'resumed'; // 상태 키 이름은 실제에 맞게 조정
+
   // 비디오 트랙 처리
   useEffect(() => {
     const videoElement = videoRef.current;
@@ -49,6 +57,8 @@ const PeerView = ({
 
     console.log('[PeerView] 🔄 새로운 videoTrack 감지:', videoTrack.id);
     console.log('videoTrack: ', videoTrack);
+
+    console.log('audioTrack: ', audioTrack);
 
     // 기존 트랙 정리
     videoElement.pause();
@@ -115,21 +125,21 @@ const PeerView = ({
     const stream = new MediaStream([audioTrack]);
     audioElement.srcObject = stream;
 
-    audioElement
-      .play()
-      .then(() => {
-        console.log('[PeerView] 오디오 자동 재생 성공');
-      })
-      .catch((err) => {
-        console.error('오디오 재생 실패:', err);
-      });
+    // audioElement
+    //   .play()
+    //   .then(() => {
+    //     console.log('[PeerView] 오디오 자동 재생 성공');
+    //   })
+    //   .catch((err) => {
+    //     console.error('오디오 재생 실패:', err);
+    //   });
   }, [audioTrack]);
 
   // 비디오 트랙 mute 상태 감지
   useEffect(() => {
     if (!videoTrack || !videoTrack.muted) return;
 
-    console.log('[PeerView] ⚠️ videoTrack is muted (possibly due to no screen update)');
+    console.log('[PeerView] ⚠️ videoTrack is muted');
 
     const roomClient = useRoomStore.getState().roomClient;
     if (!roomClient) return;

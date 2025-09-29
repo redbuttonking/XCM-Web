@@ -167,6 +167,7 @@ module.exports = {
       maxSctpMessageSize: 262144,
       // Additional options that are not part of WebRtcTransportOptions.
       maxIncomingBitrate: 1500000,
+      // maxIncomingBitrate: 20000000,// 해상도 값 확인해보기
     },
     // mediasoup PlainTransport options for legacy RTP endpoints (FFmpeg,
     // GStreamer).

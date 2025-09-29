@@ -5,6 +5,7 @@ import { ArrowUpRight, UserRound } from 'lucide-react';
 import { Button } from './ui/button';
 import { useNavigate } from 'react-router-dom';
 import ViewPointers from '../pages/Monitoring/components/ViewPointers';
+import BatteryIcon from './ui/BatteryIcon';
 
 type ActiveModeType = 'none' | 'message' | 'audio' | 'install' | 'Launch' | 'record' | 'viewGuide';
 
@@ -35,8 +36,6 @@ const Peer = ({
   // 선택된 peer에만 적용할 테두리 스타일
   const borderStyle = selected ? 'border-2 border-blue' : 'border border-[#F0F0F0]';
 
-  console.log('여기다아아아아아아아아아아', peer);
-
   // 클릭 핸들러 (단일 모니터링 화면에서는 무시)
   const handleClick = () => {
     if (!isSingle && onToggle) {
@@ -61,32 +60,38 @@ const Peer = ({
     >
       <div
         className={[
-          'flex justify-between',
+          'flex items-center justify-between',
           isSingle ? 'pb-3 pt-2' : 'mx-[5px] pb-[10px] pt-[6px]',
         ].join(' ')}
       >
-        <div className="flex items-center">
-          <UserRound color="#444444" />
-          <h3
-            className={
-              isSingle
-                ? 'ml-2 flex items-center text-sm md:text-base'
-                : 'ml-[10px] flex items-center text-xs'
-            }
-          >
-            {peer.displayName}
-            {isRecording && (
-              <span className="ml-2 flex items-center rounded-full bg-black px-2 py-0">
-                <span className="mr-2 flex items-center">
-                  <span className="relative flex h-3 w-3 items-center">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red opacity-70"></span>
-                    <span className="relative inline-flex h-[10px] w-[10px] rounded-full bg-red"></span>
+        <div className="flex w-full items-center justify-between">
+          <div className="flex">
+            <UserRound color="#444444" />
+            <h3
+              className={
+                isSingle
+                  ? 'ml-2 flex items-center text-sm md:text-base'
+                  : 'ml-[10px] flex items-center text-xs'
+              }
+            >
+              {peer.displayName}
+              {isRecording && (
+                <span className="ml-2 flex items-center rounded-full bg-black px-2 py-0">
+                  <span className="mr-2 flex items-center">
+                    <span className="relative flex h-3 w-3 items-center">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red opacity-70"></span>
+                      <span className="relative inline-flex h-[10px] w-[10px] rounded-full bg-red"></span>
+                    </span>
                   </span>
+                  <span className="text-base font-bold tracking-wide text-white">REC</span>
                 </span>
-                <span className="text-base font-bold tracking-wide text-white">REC</span>
-              </span>
-            )}
-          </h3>
+              )}
+            </h3>
+          </div>
+
+          <div className="mr-2 flex text-xs text-gray-600 md:text-sm">
+            <BatteryIcon level={peer.battery?.level} size={50} showPercentText />
+          </div>
         </div>
         {!isSingle && (
           <Button
@@ -101,7 +106,7 @@ const Peer = ({
           </Button>
         )}
       </div>
-      {/* 단일 화면에서는 PeerView 영역을 더 크게 */}
+
       <div className={isSingle ? 'h-full w-full' : ''}>
         <PeerView
           peerId={peer.id}

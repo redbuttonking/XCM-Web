@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Headphones, Download, Rocket, Video, CircleStop, Mail, Cog, Move } from 'lucide-react';
+import { Mail, Cog, Move } from 'lucide-react';
 import { useRecordingMultiStore } from '@/store/useRecordingMultiStore';
 import PanelButton from './PanelButton';
 
@@ -28,6 +28,14 @@ const PremiumControlPanel = ({ selectedPeers, onSetActiveMode }: PremiumControlP
           PREMIUM
         </span>
         {/* 메시지 보내기 */}
+
+        <PanelButton
+          icon={<Mail />}
+          label="메시지 전송"
+          disabled={!hasSelection}
+          onClick={() => onSetActiveMode('message')}
+        />
+
         <PanelButton
           icon={<Cog />}
           label="콘텐츠 제어"

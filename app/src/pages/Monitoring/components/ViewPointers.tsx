@@ -10,9 +10,6 @@ import {
 } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 import { useRoomStore } from '@/store/useRoomStore';
-import RoomClient from '@/core/RoomClient';
-import { useEffect } from 'react';
-
 interface ViewPointersProps {
   peerId?: string;
   onCancel: () => void;

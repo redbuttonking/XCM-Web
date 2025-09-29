@@ -12,7 +12,6 @@ type Props = {
 };
 
 const FileListItem = ({ file, selected, onToggle, onOpen }: Props) => {
-  console.log(file);
   return (
     <div className="relative overflow-hidden rounded-md border bg-white">
       <div className="rounded-md py-2 pl-3">

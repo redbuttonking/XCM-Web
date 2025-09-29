@@ -8,9 +8,10 @@ interface PeersProps {
   selectedPeers: string[];
   onChange: (selectedPeers: string[]) => void;
   recordingPeers: Record<string, boolean>; // 녹화중인지 확인하는 상태 값
+  onlyOnline?: boolean; // 온라인만 표시할지 여부
 }
 
-const Peers = ({ selectedPeers, onChange, recordingPeers }: PeersProps) => {
+const Peers = ({ selectedPeers, onChange, recordingPeers, onlyOnline = false }: PeersProps) => {
   // peers의 배열을 15개로 고정
   const totalSlots = 15;
 
@@ -20,8 +21,10 @@ const Peers = ({ selectedPeers, onChange, recordingPeers }: PeersProps) => {
 
   // 내 자신 제외한 peers 계산을 메모이즈
   const peers = useMemo(() => {
-    return allPeers.filter((peer) => peer.id !== myPeerId);
-  }, [allPeers, myPeerId]);
+    let list = allPeers.filter((peer) => peer.id !== myPeerId);
+    if (onlyOnline) list = list.filter((p) => p.isConnected);
+    return list;
+  }, [allPeers, myPeerId, onlyOnline]);
 
   // 선택된 peer id 배열
   // const [selectedPeers, setSelectedPeers] = useState<string[]>([]);
@@ -103,14 +106,10 @@ const Peers = ({ selectedPeers, onChange, recordingPeers }: PeersProps) => {
     return Array.from({ length: totalSlots }, (_, i) => peers[i] ?? null);
   }, [peers]);
 
-  useEffect(() => {
-    console.log('확인 fixedPeers:', fixedPeers);
-  }, [fixedPeers]);
-
   // peer가 잘 선택됐는지 확인
-  useEffect(() => {
-    console.log('선택된 peer : ', selectedPeers);
-  }, [selectedPeers]);
+  // useEffect(() => {
+  //   console.log('선택된 peer : ', selectedPeers);
+  // }, [selectedPeers]);
   return (
     <div className="grid grid-cols-5 gap-4 font-bold">
       {fixedPeers.map((peer, index) => (

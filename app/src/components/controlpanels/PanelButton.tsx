@@ -1,11 +1,13 @@
 const PanelButton = ({
   icon,
   label,
+  nextLabel,
   disabled,
   onClick,
 }: {
   icon: React.ReactNode;
   label: string;
+  nextLabel?: string;
   disabled?: boolean;
   onClick: () => void;
 }) => (

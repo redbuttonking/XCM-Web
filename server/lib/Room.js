@@ -7,6 +7,8 @@ const Logger = require("./Logger");
 const utils = require("./utils");
 const config = require("../config");
 const Bot = require("./Bot");
+const StatusHub = require("./StatusHub");
+const { lookupFromWifi } = require("../geoip.routes");
 
 const logger = new Logger("Room");
 
@@ -52,7 +54,7 @@ class Room extends EventEmitter {
 
     const bot = await Bot.create({ mediasoupRouter });
 
-    return new Room({
+    const room = new Room({
       roomId,
       protooRoom,
       webRtcServer: mediasoupWorker.appData.webRtcServer,
@@ -62,6 +64,40 @@ class Room extends EventEmitter {
       consumerReplicas,
       bot,
     });
+
+    // ✅ StatusHub 생성 (wifiGeoService 어댑터 주입)
+    const wifiGeoService = {
+      // StatusHub는 .lookup({ssid,bssid,rssiDbm}) 시그니처를 기대함
+      async lookup({ ssid, bssid, rssiDbm }) {
+        // lookupFromWifi는 복수 AP 배열을 받도록 되어있다면 이렇게 한 개만 넘겨도 됨
+        const res = await lookupFromWifi([
+          { ssid: ssid || undefined, bssid: bssid || undefined, rssi: rssiDbm },
+        ]);
+        // res 포맷에 맞춰 Normalize (아래 키 이름은 네가 쓰는 geoip.service.js 반환값에 맞춰 조정)
+        if (!res) return null;
+        return {
+          placeLabel: res.placeLabel ?? null,
+          geoCity: res.geoCity ?? null,
+          geo: res.pos ?? res.geo ?? null, // { lat, lon }
+          source: res.source ?? "apmap",
+          accuracy: res.accuracyM ?? res.accuracy ?? null,
+          accuracyM: res.accuracyM ?? res.accuracy ?? null,
+        };
+      },
+    };
+
+    const statusHub = await StatusHub.create({
+      mediasoupRouter,
+      wifiGeoService,
+      // Room의 헬퍼 주입
+      createDataConsumerFn: (args) => room._createDataConsumer(args),
+      getJoinedPeersFn: (...a) => room._getJoinedPeers(...a),
+    });
+
+    // ✅ 주입
+    room._statusHub = statusHub;
+
+    return room;
   }
 
   constructor({
@@ -123,6 +159,7 @@ class Room extends EventEmitter {
     // DataChannel bot.
     // @type {Bot}
     this._bot = bot;
+    this._handledDataProducerIds = new Set();
 
     // Consumer replicas.
     // @type {Number}
@@ -836,7 +873,7 @@ class Room extends EventEmitter {
         // Ensure the Peer is not already joined.
         if (peer.data.joined) throw new Error("Peer already joined");
 
-        const { displayName, device, rtpCapabilities, sctpCapabilities } =
+        const { displayName, device, rtpCapabilities, sctpCapabilities, role } =
           request.data;
 
         // Store client data into the protoo Peer data object.
@@ -853,6 +890,7 @@ class Room extends EventEmitter {
           "[Room.js] ✅ peer.data.sctpCapabilities now:",
           peer.data.sctpCapabilities
         );
+        peer.data.role = role === "admin" ? "admin" : "device";
 
         // Tell the new Peer about already joined Peers.
         // And also create Consumers for existing Producers.
@@ -875,6 +913,14 @@ class Room extends EventEmitter {
 
         // Mark the new Peer as joined.
         peer.data.joined = true;
+
+        if (peer.data.role === "admin") {
+          try {
+            await this._statusHub?.wireOutToPeer(peer);
+          } catch (e) {
+            logger.warn("wireOutToPeer failed:", e);
+          }
+        }
 
         for (const joinedPeer of joinedPeers) {
           // Create Consumers for existing Producers.
@@ -911,6 +957,16 @@ class Room extends EventEmitter {
           dataProducerPeer: null,
           dataProducer: this._bot.dataProducer,
         });
+
+        // ✅ 관리자라면 서버발 status.enriched를 구독(중복 방지 가드 포함)
+        if (peer.data.role === "admin") {
+          const hasEnriched = Array.from(peer.data.dataConsumers.values()).some(
+            (dc) => dc.label === "status.enriched"
+          );
+          if (!hasEnriched) {
+            await this._statusHub?.wireOutToPeer(peer);
+          }
+        }
 
         // Notify the new Peer to all other Peers.
         for (const otherPeer of this._getJoinedPeers({ excludePeer: peer })) {
@@ -1020,6 +1076,16 @@ class Room extends EventEmitter {
           dtlsParameters: transport.dtlsParameters,
           sctpParameters: transport.sctpParameters,
         });
+
+        // consuming 트랜스포트가 방금 만들어졌고, 관리자면 status.enriched 연결(중복 방지)
+        if (transport.appData.consuming && peer.data.role === "admin") {
+          const hasEnriched = Array.from(peer.data.dataConsumers.values()).some(
+            (dc) => dc.label === "status.enriched"
+          );
+          if (!hasEnriched) {
+            await this._statusHub?.wireOutToPeer(peer);
+          }
+        }
 
         if (transport.appData.consuming) {
           for (const otherPeer of this._getJoinedPeers({ excludePeer: peer })) {
@@ -1282,36 +1348,42 @@ class Room extends EventEmitter {
       }
 
       case "pauseConsumer": {
-        // Ensure the Peer is joined.
-        if (!peer.data.joined) throw new Error("Peer not yet joined");
-
         const { consumerId } = request.data;
+        console.log(
+          `[Room.js] pauseConsumer 요청 수신 - consumerId: ${consumerId}, peerId: ${peer.id}`
+        );
         const consumer = peer.data.consumers.get(consumerId);
-
-        if (!consumer)
+        if (!consumer) {
+          console.warn(
+            `[Room.js] pauseConsumer 요청에서 consumer를 찾을 수 없음 - consumerId: ${consumerId}`
+          );
           throw new Error(`consumer with id "${consumerId}" not found`);
-
+        }
         await consumer.pause();
-
+        console.log(
+          `[Room.js] pauseConsumer 처리 완료 - consumerId: ${consumerId}`
+        );
         accept();
-
         break;
       }
 
       case "resumeConsumer": {
-        // Ensure the Peer is joined.
-        if (!peer.data.joined) throw new Error("Peer not yet joined");
-
         const { consumerId } = request.data;
+        console.log(
+          `[Room.js] resumeConsumer 요청 수신 - consumerId: ${consumerId}, peerId: ${peer.id}`
+        );
         const consumer = peer.data.consumers.get(consumerId);
-
-        if (!consumer)
+        if (!consumer) {
+          console.warn(
+            `[Room.js] resumeConsumer 요청에서 consumer를 찾을 수 없음 - consumerId: ${consumerId}`
+          );
           throw new Error(`consumer with id "${consumerId}" not found`);
-
+        }
         await consumer.resume();
-
+        console.log(
+          `[Room.js] resumeConsumer 처리 완료 - consumerId: ${consumerId}`
+        );
         accept();
-
         break;
       }
 
@@ -1368,6 +1440,14 @@ class Room extends EventEmitter {
 
       case "produceData": {
         // Ensure the Peer is joined.
+
+        console.log(
+          "여기요 [Room] produceData label:",
+          request.data?.label,
+          "from peer:",
+          peer.id
+        );
+
         if (!peer.data.joined) throw new Error("Peer not yet joined");
 
         const { transportId, sctpStreamParameters, label, protocol, appData } =
@@ -1389,6 +1469,25 @@ class Room extends EventEmitter {
         peer.data.dataProducers.set(dataProducer.id, dataProducer);
 
         accept({ id: dataProducer.id });
+
+        // 상태 채널 라우팅: 단말(device) → 관리자(admin)만
+        if (dataProducer.label === "status") {
+          // 단말 status 채널을 StatusHub에 연결 (서버가 직접 consume->enrich->broadcast)
+          this._statusHub?.attachDeviceStatusProducer({
+            dataProducerFromDevice: dataProducer,
+            fromPeer: peer,
+          });
+
+          for (const otherPeer of this._getJoinedPeers({ excludePeer: peer })) {
+            if (otherPeer.data?.role !== "admin") continue;
+            this._createDataConsumer({
+              dataConsumerPeer: otherPeer,
+              dataProducerPeer: peer,
+              dataProducer,
+            });
+          }
+          break; // 여기서 종료 (아래 chat/bot 분기로 내려가지 않게)
+        }
 
         switch (dataProducer.label) {
           case "chat": {
@@ -1869,6 +1968,58 @@ class Room extends EventEmitter {
       dataConsumer = await transport.consumeData({
         dataProducerId: dataProducer.id,
       });
+
+      if (
+        dataProducer && // 원본 dataProducer 정보가 있고
+        dataProducer.label === "status" && // 상태 채널만 처리
+        !this._handledDataProducerIds.has(dataProducer.id) // 아직 핸들러 안 붙였으면
+      ) {
+        this._handledDataProducerIds.add(dataProducer.id);
+
+        // 서버 측에서 단말의 status 채널 메시지 수신
+        dataConsumer.on("message", async (msg) => {
+          try {
+            const text = Buffer.isBuffer(msg)
+              ? msg.toString("utf8")
+              : String(msg || "");
+            let payload;
+            try {
+              payload = JSON.parse(text);
+            } catch {
+              return;
+            }
+
+            // 기대 포맷: { type: 'wifi-scan', peerId: '<peerId>', wifi: [{bssid,ssid,rssi}, ...] }
+            if (payload?.type !== "wifi-scan" || !Array.isArray(payload.wifi))
+              return;
+
+            // 1) Wi-Fi 스캔 → 좌표 추정
+            const result = await lookupFromWifi(payload.wifi); // { pos, accuracyM, source, contributing } | null
+            if (!result) return; // AP 매핑 실패 시 그냥 무시 (필요하면 GeoIP fallback 추가)
+
+            // 2) 관리자에게 푸시
+            const originPeerId =
+              (dataProducerPeer && dataProducerPeer.id) ||
+              payload.peerId ||
+              null;
+
+            const notifyData = {
+              peerId: originPeerId,
+              pos: result.pos,
+              accuracyM: result.accuracyM,
+              source: result.source, // 'apmap'
+              contributing: result.contributing, // 디버깅/툴팁용
+            };
+
+            for (const adminPeer of this._getJoinedPeers()) {
+              if (adminPeer.data?.role !== "admin") continue;
+              adminPeer.notify("device-location", notifyData).catch(() => {});
+            }
+          } catch (e) {
+            logger.warn("[Room] wifi-scan handling error: %o", e);
+          }
+        });
+      }
     } catch (error) {
       logger.warn("_createDataConsumer() | transport.consumeData():%o", error);
 
@@ -1882,6 +2033,7 @@ class Room extends EventEmitter {
     dataConsumer.on("transportclose", () => {
       // Remove from its map.
       dataConsumerPeer.data.dataConsumers.delete(dataConsumer.id);
+      if (dataProducer) this._handledDataProducerIds.delete(dataProducer.id);
     });
 
     dataConsumer.on("dataproducerclose", () => {
@@ -1891,6 +2043,8 @@ class Room extends EventEmitter {
       dataConsumerPeer
         .notify("dataConsumerClosed", { dataConsumerId: dataConsumer.id })
         .catch(() => {});
+
+      if (dataProducer) this._handledDataProducerIds.delete(dataProducer.id);
     });
 
     // Send a protoo request to the remote Peer with Consumer parameters.

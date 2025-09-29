@@ -23,6 +23,7 @@ const { AwaitQueue } = require("awaitqueue");
 const Logger = require("./lib/Logger");
 const utils = require("./lib/utils");
 const Room = require("./lib/Room");
+const placeMap = require("./lib/placeMapStore");
 const interactiveServer = require("./lib/interactiveServer");
 const interactiveClient = require("./lib/interactiveClient");
 
@@ -31,9 +32,14 @@ const multer = require("multer");
 const path = require("path");
 const ffmpeg = require("fluent-ffmpeg");
 
+// const { lookupFromWifi } = require("./geoip.routes");
+// const { lookupFromWifi } = require("./geo.service");
+const { mountGeoIpRoutes, setPeerIp } = require("./geoip.routes");
+
 // CORS 화이트리스트 (운영 도메인 추가해야함)
 const ALLOWED_ORIGINS = [
   "http://localhost:3000",
+  "https://localhost:3000",
   "http://192.168.0.10:3000",
   "https://192.168.0.10:3000",
 ];
@@ -173,6 +179,12 @@ async function createExpressApp() {
 
   const expressApp = express();
 
+  await mountGeoIpRoutes(expressApp, {
+    dbPath: path.resolve(__dirname, "GeoLite2-City.mmdb"),
+    trustProxy: true, // nginx 등 프록시 뒤라면 true 유지
+    defaultAccuracyM: 8000, // 도시 레벨 반경(원하시면 조정)
+  });
+
   // ✅ CORS 설정 (화이트리스트 + credentials)
   const corsOptions = {
     origin(origin, cb) {
@@ -199,6 +211,34 @@ async function createExpressApp() {
   // JSON body 파싱용
   expressApp.use(bodyParser.json());
 
+  expressApp.post("/ingest/wifi-scan", async (req, res) => {
+    try {
+      const { peerId, wifi } = req.body || {};
+      if (!Array.isArray(wifi) || wifi.length === 0) {
+        return res.status(400).json({ ok: false, reason: "NO_WIFI_ARRAY" });
+      }
+
+      const wifiCapped = wifi.slice(0, 50); // 너무 긴 배열 제한(악성 페이로드 방지)
+
+      const result = await lookupFromWifi(wifiCapped); // { pos, accuracyM, source, contributing } | null
+
+      if (!result) {
+        // AP 매핑 실패 → 필요하다면 여기서 GeoIP fallback 호출 가능
+        return res.status(200).json({ ok: false, reason: "NO_APMAP_MATCH" });
+      }
+
+      // TODO: 여기서 관리자 웹으로 푸시(protoo/WS)를 하고 싶다면, peerTransportMap을 돌며 notify/send 하세요.
+      // 예시 (알림 페이로드):
+      // const payload = { method: 'device-location', data: { peerId, ...result } };
+      // notifyAllAdmins(payload); // 구현해두면 됨
+
+      return res.json({ ok: true, peerId, ...result });
+    } catch (e) {
+      console.error("[/ingest/wifi-scan] error:", e);
+      return res.status(500).json({ ok: false, reason: "SERVER_ERROR" });
+    }
+  });
+
   // ✅ 업로드/변환 디렉토리 보장
   const uploadDir = path.resolve(__dirname, "uploads");
   const convertedDir = path.resolve(__dirname, "converted");
@@ -208,17 +248,6 @@ async function createExpressApp() {
 
   // 업로드용 multer 설정
   const upload = multer({ dest: uploadDir });
-
-  // 서버 안정을 위해 업로드 한도 / 타입 제한 지정 코드
-  //   const upload = multer({
-  //   dest: uploadDir,
-  //   limits: { fileSize: 200 * 1024 * 1024 }, // 200MB
-  //   fileFilter: (req, file, cb) => {
-  //     // webm만 받는다면:
-  //     // if (file.mimetype !== "video/webm") return cb(new Error("Only webm allowed"));
-  //     cb(null, true);
-  //   }
-  // });
 
   /**
    * For every API request, verify that the roomId in the path matches and
@@ -507,6 +536,29 @@ async function createExpressApp() {
     }
   });
 
+  // 전역 조회
+  expressApp.get("/place-map", (req, res) => {
+    res.status(200).json(placeMap.load());
+  });
+
+  // 추가/수정 (ssid 또는 bssid 중 1개 + label)
+  expressApp.put("/place-map", (req, res) => {
+    const { ssid, bssid, label } = req.body || {};
+    try {
+      const data = placeMap.setLabel({ ssid, bssid, label });
+      res.status(200).json(data);
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // 삭제 (ssid 또는 bssid 중 1개)
+  expressApp.delete("/place-map", (req, res) => {
+    const { ssid, bssid } = req.body || {};
+    const data = placeMap.deleteLabel({ ssid, bssid });
+    res.status(200).json(data);
+  });
+
   expressApp.use((req, res) => {
     res.status(404).send("Not Found");
   });
@@ -575,6 +627,16 @@ async function runProtooWebSocketServer() {
     const roomId = u.query["roomId"];
     const peerId = u.query["peerId"];
 
+    // 클라이언트 IP 추출 (프록시 고려)
+    // const xf = (info.headers["x-forwarded-for"] || "").split(",")[0].trim();
+    // const remoteIp = (xf || info.socket.remoteAddress || "").replace(
+    //   /^::ffff:/,
+    //   ""
+    // );
+
+    // // peerId -> IP 저장 (GeoIP 조회에 사용)
+    // if (peerId && remoteIp) setPeerIp(peerId, remoteIp);
+
     if (!roomId || !peerId) {
       reject(400, "Connection request without roomId and/or peerId");
 
@@ -639,7 +701,11 @@ async function getOrCreateRoom({ roomId, consumerReplicas }) {
 
     const mediasoupWorker = getMediasoupWorker();
 
-    room = await Room.create({ mediasoupWorker, roomId, consumerReplicas });
+    room = await Room.create({
+      mediasoupWorker,
+      roomId,
+      consumerReplicas,
+    });
 
     rooms.set(roomId, room);
     room.on("close", () => rooms.delete(roomId));

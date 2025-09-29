@@ -1,10 +1,19 @@
 import type { FolderFile } from '@/types/filesystem';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
+import { useRef } from 'react';
+import { useFixVideoDuration } from '@/hooks/useFixVideoDuration';
 
 export default function DetailPane({ file, onBack }: { file: FolderFile; onBack: () => void }) {
   const isImage = /^(png|jpg|jpeg|gif|webp|avif)$/i.test(file.type);
   const isVideo = /^(webm|mp4|mov)$/i.test(file.type);
+
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  useFixVideoDuration(videoRef.current, file.url);
+
+  const v = document.querySelector('video');
+  console.log('duration:', v?.duration); // 실제보다 짧게 나오는지
+  console.log('seekable:', v?.seekable.length ? v?.seekable.end(0) : 0); // 시킹 가능한 구간
 
   return (
     <div className="flex flex-col gap-3">
@@ -28,11 +37,15 @@ export default function DetailPane({ file, onBack }: { file: FolderFile; onBack:
         )}
         {isVideo && (
           <video
+            key={file.url}
+            ref={videoRef}
             src={file.url}
             className="h-full w-full object-contain"
             controls
-            autoPlay
             playsInline
+            preload="metadata"
+            autoPlay
+            muted
           />
         )}
         {!isImage && !isVideo && (
