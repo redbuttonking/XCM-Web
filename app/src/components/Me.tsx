@@ -1,4 +1,5 @@
 // components/Me.tsx
+import { useState } from 'react';
 import MicVolumeMeter from './MicVolumeMeter';
 import PeerView from './PeerView';
 import { useRoomStore } from '@/store/useRoomStore';
@@ -39,7 +40,7 @@ const Me = () => {
   };
 
   return (
-    <div className="rounded-lg bg-gray-800 p-2">
+    <div className="m-[16px] w-[300px] rounded-lg bg-gray-800 p-2">
       <h2 className="mb-1 text-sm">나</h2>
       <PeerView micTrack={micTrack} videoTrack={webcamTrack} />
       <div className="mt-2 flex gap-2">
@@ -53,6 +54,7 @@ const Me = () => {
           {webcamEnabled ? '카메라 끄기' : '카메라 켜기'}
         </button>
       </div>
+
       {/* <MicVolumeMeter /> */}
     </div>
   );

@@ -8,3 +8,5 @@ node_modules/
 /.vscode/
 
 /app/dist/
+
+server/GeoLite2-City.mmdb

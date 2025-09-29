@@ -1,4 +1,4 @@
-// import { defineConfig } from 'vite'; // ✅ 꼭 필요!
+// import { defineConfig } from 'vite';
 // import react from '@vitejs/plugin-react-swc';
 // import path from 'path';
 // import { fileURLToPath } from 'url';
@@ -40,7 +40,31 @@ export default defineConfig({
       key: fs.readFileSync(path.resolve(__dirname, '../server/key.pem')),
       cert: fs.readFileSync(path.resolve(__dirname, '../server/cert.pem')),
     },
-
+    proxy: {
+      // WebSocket 프록시 (프로투)
+      '/ws': {
+        target: 'https://localhost:4443', // mediasoup 서버
+        ws: true,
+        changeOrigin: true,
+        secure: false, // 개발용 self-signed 허용
+      },
+      // REST 프록시 (place-map / 업로드/다운로드 등)
+      '/place-map': {
+        target: 'https://localhost:4443',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/upload-webm': {
+        target: 'https://localhost:4443',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/download': {
+        target: 'https://localhost:4443',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
     // 로컬 호스트 전용
     // host: 'localhost',
   },

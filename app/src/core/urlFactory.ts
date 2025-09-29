@@ -29,10 +29,8 @@ interface Params {
 
 export function getProtooUrl(params: Params): string {
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  const hostname = window.location.hostname;
-  const port = 4443; // 실제 사용하는 포트 번호로 바꿔줘야 함
-
+  const host = window.location.host; // ex) localhost:3000
   const query = qs.stringify(params);
-
-  return `${protocol}://${hostname}:${port}/?${query}`;
+  // 프록시 경로로 붙는다 → Vite가 4443으로 터널링
+  return `${protocol}://${host}/ws?${query}`;
 }

@@ -7,8 +7,7 @@ import ClassManagement from './pages/ClassManagement';
 import DeviceManagement from './pages/DeviceManagement';
 import RecordingManagement from './pages/RecordingManagement';
 import FeedbackManagement from './pages/FeedbackManagement';
-import Room from './components/Room';
-
+import 'leaflet/dist/leaflet.css';
 
 const App = () => {
   return (
@@ -22,8 +21,7 @@ const App = () => {
           <Route path="/recordingmanagement" element={<RecordingManagement />} />
           <Route path="/feedbackmanagement" element={<FeedbackManagement />} />
           <Route path="/settings" element={<Settings />} />
-          <Route path="/room" element={<Room />} />
-
+          {/* <Route path="/room" element={<Room />} /> */}
         </Route>
       </Routes>
     </BrowserRouter>
