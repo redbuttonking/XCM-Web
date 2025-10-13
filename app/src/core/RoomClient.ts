@@ -26,6 +26,7 @@ interface RoomClientOptions {
   peerId: string;
   displayName: string;
   forceTcp?: boolean;
+  extraQuery?: Record<string, string>;
 }
 
 type MaybeLabel = string | { label?: string; value?: string } | null | undefined;
@@ -74,12 +75,12 @@ export default class RoomClient {
     }
   }
 
-  constructor({ roomId, peerId, displayName, forceTcp = false }: RoomClientOptions) {
+  constructor({ roomId, peerId, displayName, forceTcp = false, extraQuery }: RoomClientOptions) {
     this._roomId = roomId;
     this._peerId = peerId;
     this._displayName = displayName;
     this._forceTcp = forceTcp;
-    this._protooUrl = getProtooUrl({ roomId, peerId });
+    this._protooUrl = getProtooUrl({ roomId, peerId }, extraQuery);
   }
 
   close(): void {
@@ -406,7 +407,7 @@ export default class RoomClient {
         // 디버깅 리스너
         // 나중에 지워도 됨
         this._dataProducer.on('open', () => {
-          console.log('[RoomClient] DataProducer open - 채팅 사용 가능');
+          console.log('[RoomClient] DataProducer open');
         });
         this._dataProducer.on('close', () => {
           console.warn('[RoomClient] DataProducer closed');

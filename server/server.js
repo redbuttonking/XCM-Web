@@ -256,8 +256,17 @@ async function createExpressApp() {
   expressApp.param("roomId", (req, res, next, roomId) => {
     queue
       .push(async () => {
-        req.room = await getOrCreateRoom({ roomId, consumerReplicas: 0 });
+        // 기존 getOrCreateRoom를 분리하기전 room 생성 방식
+        // req.room = await getOrCreateRoom({ roomId, consumerReplicas: 0 });
 
+        const room = getRoom(roomId);
+        if (!room) {
+          const err = Object.assign(new Error("room-not-found"), {
+            status: 404,
+          });
+          throw err;
+        }
+        req.room = room;
         next();
       })
       .catch((error) => {
@@ -627,6 +636,63 @@ async function runProtooWebSocketServer() {
     const roomId = u.query["roomId"];
     const peerId = u.query["peerId"];
 
+    const adminId = u.query["adminId"];
+    const token = u.query["token"]; // 현재 mock 데이터로 존재 여부만 체크하는중
+
+    let consumerReplicas = Number(u.query["consumerReplicas"]);
+    if (isNaN(consumerReplicas)) consumerReplicas = 0;
+
+    if (!roomId || !peerId) {
+      return reject(400, "roomId/peerId required");
+    }
+
+    const isAdmin = typeof peerId === "string" && peerId.startsWith("admin-");
+    const roomExists = rooms.has(roomId);
+    const tokenOk = !!token; // TODO: 실제로 토큰을 받는다면 verifyJwt(token) 등으로 교체
+
+    logger.info(
+      "protoo connection request [roomId:%s, peerId:%s, address:%s, origin:%s]",
+      roomId,
+      peerId,
+      info.socket.remoteAddress,
+      info.origin
+    );
+
+    // 방이 있으면 누구나 join 허용
+    const existing = getRoom(roomId);
+    if (existing) {
+      return queue
+        .push(async () => {
+          const transport = accept();
+          existing.handleProtooConnection({
+            peerId,
+            protooWebSocketTransport: transport,
+          });
+        })
+        .catch((err) => reject(err));
+    }
+
+    // 방이 없으면 '관리자 본인'만 방 생성 허용
+    // - 관리자 피어 형식: admin-<id>
+    // - adminId === roomId
+    // - (운영) token 유효성 검증 (개발은 존재 여부만)
+    if (isAdmin && adminId === roomId && tokenOk) {
+      return queue
+        .push(async () => {
+          const room = await createRoom({ roomId, consumerReplicas: 0 });
+          const transport = accept();
+          room.handleProtooConnection({
+            peerId,
+            protooWebSocketTransport: transport,
+          });
+        })
+        .catch((err) => reject(err));
+    }
+
+    // 그 외는 방 없음
+    logger.warn("join denied: room not found [roomId:%s]", roomId);
+    return reject(404, "room-not-found");
+
     // 클라이언트 IP 추출 (프록시 고려)
     // const xf = (info.headers["x-forwarded-for"] || "").split(",")[0].trim();
     // const remoteIp = (xf || info.socket.remoteAddress || "").replace(
@@ -637,43 +703,42 @@ async function runProtooWebSocketServer() {
     // // peerId -> IP 저장 (GeoIP 조회에 사용)
     // if (peerId && remoteIp) setPeerIp(peerId, remoteIp);
 
-    if (!roomId || !peerId) {
-      reject(400, "Connection request without roomId and/or peerId");
+    // room 생성 기존 코드
+    // if (!roomId || !peerId) {
+    //   reject(400, "Connection request without roomId and/or peerId");
+    //   return;
+    // }
 
-      return;
-    }
+    // let consumerReplicas = Number(u.query["consumerReplicas"]);
 
-    let consumerReplicas = Number(u.query["consumerReplicas"]);
+    // if (isNaN(consumerReplicas)) {
+    //   consumerReplicas = 0;
+    // }
 
-    if (isNaN(consumerReplicas)) {
-      consumerReplicas = 0;
-    }
+    // // Serialize this code into the queue to avoid that two peers connecting at
+    // // the same time with the same roomId create two separate rooms with same
+    // // roomId.
+    // queue
+    //   .push(async () => {
+    //     // 기존 getOrCreateRoom를 분리하기전 room 생성 방식
+    //     // const room = await getOrCreateRoom({ roomId, consumerReplicas });
 
-    logger.info(
-      "protoo connection request [roomId:%s, peerId:%s, address:%s, origin:%s]",
-      roomId,
-      peerId,
-      info.socket.remoteAddress,
-      info.origin
-    );
+    //     const room = getRoom(roomId);
+    //     if (!room) {
+    //       logger.warn("join denied: room not found [roomId:%s]", roomId);
+    //       return reject(404, "room-not-found");
+    //     }
 
-    // Serialize this code into the queue to avoid that two peers connecting at
-    // the same time with the same roomId create two separate rooms with same
-    // roomId.
-    queue
-      .push(async () => {
-        const room = await getOrCreateRoom({ roomId, consumerReplicas });
+    //     // Accept the protoo WebSocket connection.
+    //     const protooWebSocketTransport = accept();
 
-        // Accept the protoo WebSocket connection.
-        const protooWebSocketTransport = accept();
+    //     room.handleProtooConnection({ peerId, protooWebSocketTransport });
+    //   })
+    //   .catch((error) => {
+    //     logger.error("room creation or room joining failed:%o", error);
 
-        room.handleProtooConnection({ peerId, protooWebSocketTransport });
-      })
-      .catch((error) => {
-        logger.error("room creation or room joining failed:%o", error);
-
-        reject(error);
-      });
+    //     reject(error);
+    //   });
   });
 }
 
@@ -692,24 +757,49 @@ function getMediasoupWorker() {
 /**
  * Get a Room instance (or create one if it does not exist).
  */
-async function getOrCreateRoom({ roomId, consumerReplicas }) {
-  let room = rooms.get(roomId);
+// async function getOrCreateRoom({ roomId, consumerReplicas }) {
+//   let room = rooms.get(roomId);
 
-  // If the Room does not exist create a new one.
-  if (!room) {
-    logger.info("creating a new Room [roomId:%s]", roomId);
+//   // If the Room does not exist create a new one.
+//   if (!room) {
+//     logger.info("creating a new Room [roomId:%s]", roomId);
 
-    const mediasoupWorker = getMediasoupWorker();
+//     const mediasoupWorker = getMediasoupWorker();
 
-    room = await Room.create({
-      mediasoupWorker,
-      roomId,
-      consumerReplicas,
-    });
+//     room = await Room.create({
+//       mediasoupWorker,
+//       roomId,
+//       consumerReplicas,
+//     });
 
-    rooms.set(roomId, room);
-    room.on("close", () => rooms.delete(roomId));
+//     rooms.set(roomId, room);
+//     room.on("close", () => rooms.delete(roomId));
+//   }
+
+//   return room;
+// }
+
+// 위 getOrCreateRoom 함수를 아래와 같이 분리 시킴.
+
+function getRoom(roomId) {
+  return rooms.get(roomId);
+}
+
+async function createRoom({ roomId, consumerReplicas = 0 }) {
+  if (rooms.has(roomId)) {
+    throw Object.assign(new Error("room-exists"), { status: 409 });
   }
+
+  const mediasoupWorker = getMediasoupWorker();
+
+  const room = await Room.create({
+    mediasoupWorker,
+    roomId,
+    consumerReplicas,
+  });
+
+  rooms.set(roomId, room);
+  room.on("close", () => rooms.delete(roomId));
 
   return room;
 }

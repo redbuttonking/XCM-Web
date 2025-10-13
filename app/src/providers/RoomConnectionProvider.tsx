@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import RoomClient from '@/core/RoomClient';
 import { useRoomStore } from '@/store/useRoomStore';
 import type { DCMessage } from '@/types/datachannel';
+import { useAuthStore } from '@/store/useAuthStore';
 import { loadAllDeviceSnapshots, upsertDeviceSnapshot } from '@/core/utils';
 import { v4 as uuidv4 } from 'uuid'; // 렌덤으로 peerId ,roomId 생성
 
@@ -15,23 +16,85 @@ const RoomConnectionProvider = () => {
   const rcRef = useRef<RoomClient | null>(null);
   const roomClient = useRoomStore((s) => s.roomClient);
 
+  // ✅ 로그인 mock 데이터 주입된 값 사용
+  const adminId = useAuthStore((s) => s.adminId);
+  const jwt = useAuthStore((s) => s.jwt);
+
+  // 기존 Room 생성 방식(자동 and 하드코딩)
+  // useEffect(() => {
+  //   // zustand 상태는 getState()로 1회 접근 (deps에 안 걸리게)
+  //   const store = useRoomStore.getState();
+
+  //   // 이미 생성되어 있으면 재생성/재조인 방지
+  //   if (!rcRef.current) {
+  //     // const roomId = uuidv4();
+  //     // const peerId = uuidv4();
+  //     const roomId = 'monitoringRoom'; // 임시 고정
+  //     const peerId = 'admin-web'; // 임시 고정
+  //     const displayName = 'admin_displayName'; // 임시 고정 (로그인 연동 시 교체)
+
+  //     rcRef.current = new RoomClient({
+  //       roomId,
+  //       peerId,
+  //       displayName,
+  //       forceTcp: false,
+  //     });
+
+  //     store.setRoomClient(rcRef.current);
+  //   }
+
+  //   // 이미 join 되어 있지 않으면 join
+  //   if (!store.joined) {
+  //     rcRef
+  //       .current!.join()
+  //       .then(() => {
+  //         useRoomStore.getState().setJoined(true);
+  //       })
+  //       .catch((err) => {
+  //         console.error('[RoomConnectionProvider] join 실패:', err);
+  //         useRoomStore.getState().setJoined(false);
+  //       });
+  //   }
+
+  //   // 탭 닫힘/새로고침 시 정리
+  //   const onUnload = () => {
+  //     try {
+  //       rcRef.current?.close();
+  //     } catch {}
+  //   };
+  //   window.addEventListener('beforeunload', onUnload);
+
+  //   // 레이아웃이 정말로 언마운트될 때만 close
+  //   return () => {
+  //     window.removeEventListener('beforeunload', onUnload);
+  //     try {
+  //       rcRef.current?.close();
+  //     } finally {
+  //       rcRef.current = null;
+  //       useRoomStore.getState().resetRoom();
+  //     }
+  //   };
+  // }, []);
+
   useEffect(() => {
-    // zustand 상태는 getState()로 1회 접근 (deps에 안 걸리게)
+    // 아직 adminId가 없으면(로그인/mock 데이터 전) 아무 것도 안 함
+    if (!adminId) return;
+
     const store = useRoomStore.getState();
 
     // 이미 생성되어 있으면 재생성/재조인 방지
     if (!rcRef.current) {
-      // const roomId = uuidv4();
-      // const peerId = uuidv4();
-      const roomId = 'monitoringRoom'; // 임시 고정
-      const peerId = 'admin-web'; // 임시 고정
-      const displayName = 'admin_displayName'; // 임시 고정 (로그인 연동 시 교체)
+      const roomId = adminId; // ✅ 방 = 관리자 ID
+      const peerId = `admin-${adminId}`; // ✅ 피어 = admin-<ID>
+      const displayName = 'admin-web'; // 필요시 표시명으로 교체
 
       rcRef.current = new RoomClient({
         roomId,
         peerId,
         displayName,
         forceTcp: false,
+        // ✅ JWT가 있으면 token까지 쿼리에 담아서 서버에서 관리자 검증
+        extraQuery: jwt ? { token: jwt, adminId } : { adminId },
       });
 
       store.setRoomClient(rcRef.current);
@@ -41,9 +104,7 @@ const RoomConnectionProvider = () => {
     if (!store.joined) {
       rcRef
         .current!.join()
-        .then(() => {
-          useRoomStore.getState().setJoined(true);
-        })
+        .then(() => useRoomStore.getState().setJoined(true))
         .catch((err) => {
           console.error('[RoomConnectionProvider] join 실패:', err);
           useRoomStore.getState().setJoined(false);
@@ -68,7 +129,7 @@ const RoomConnectionProvider = () => {
         useRoomStore.getState().resetRoom();
       }
     };
-  }, []);
+  }, [adminId, jwt]); // ✅ auth 값 바뀌면 재평가
 
   useEffect(() => {
     const rc = useRoomStore.getState().roomClient;
