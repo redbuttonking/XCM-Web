@@ -26,6 +26,7 @@ interface RoomClientOptions {
   peerId: string;
   displayName: string;
   forceTcp?: boolean;
+  extraQuery?: Record<string, string>;
 }
 
 type MaybeLabel = string | { label?: string; value?: string } | null | undefined;
@@ -74,12 +75,12 @@ export default class RoomClient {
     }
   }
 
-  constructor({ roomId, peerId, displayName, forceTcp = false }: RoomClientOptions) {
+  constructor({ roomId, peerId, displayName, forceTcp = false, extraQuery }: RoomClientOptions) {
     this._roomId = roomId;
     this._peerId = peerId;
     this._displayName = displayName;
     this._forceTcp = forceTcp;
-    this._protooUrl = getProtooUrl({ roomId, peerId });
+    this._protooUrl = getProtooUrl({ roomId, peerId }, extraQuery);
   }
 
   close(): void {
@@ -406,7 +407,7 @@ export default class RoomClient {
         // 디버깅 리스너
         // 나중에 지워도 됨
         this._dataProducer.on('open', () => {
-          console.log('[RoomClient] DataProducer open - 채팅 사용 가능');
+          console.log('[RoomClient] DataProducer open');
         });
         this._dataProducer.on('close', () => {
           console.warn('[RoomClient] DataProducer closed');
@@ -696,34 +697,29 @@ export default class RoomClient {
     if (obj?.type === 'status') {
       const api = useRoomStore.getState();
       const ts = obj.ts ?? Date.now();
-      // 배터리 정규화
-      const clamp = (n: number) => Math.max(0, Math.min(100, n));
-      const battery =
-        typeof obj.battery === 'number'
-          ? { level: clamp(obj.battery) }
-          : obj && typeof obj.battery === 'object'
-            ? {
-                level: typeof obj.battery.level === 'number' ? clamp(obj.battery.level) : undefined,
-                charging:
-                  typeof obj.battery.charging === 'boolean' ? obj.battery.charging : undefined,
-              }
+      const nextIp =
+        typeof obj.publicIp === 'string'
+          ? obj.publicIp
+          : typeof obj.ip === 'string'
+            ? obj.ip
             : undefined;
+      // 배터리 정규화 * 그냥 그래도 넣음 {level: 99, charging: false}
+      // const clamp = (n: number) => Math.max(0, Math.min(100, n));
+      // const battery =
+      //   typeof obj.battery === 'number'
+      //     ? { level: clamp(obj.battery) }
+      //     : obj && typeof obj.battery === 'object'
+      //       ? {
+      //           level: typeof obj.battery.level === 'number' ? clamp(obj.battery.level) : undefined,
+      //           charging:
+      //             typeof obj.battery.charging === 'boolean' ? obj.battery.charging : undefined,
+      //         }
+      //       : undefined;
+      const controllerBattery = obj.controllerBattery ?? obj.controller ?? obj.controllers?.battery;
 
-      if (DEBUG_DC) {
-        0;
-        const w = obj.wifi || {};
-        const battStr = battery
-          ? `${battery.level ?? '-'}${battery.charging === true ? ' (⚡)' : ''}`
-          : '-';
-        console.log(
-          `[RoomClient] status(simple) from=${fromPeerId} model=${obj.modelName ?? '-'} ` +
-            `batt=${battStr} wifi=${w.ssid ?? '-'} / ${w.bssid ?? '-'}`,
-        );
-      }
-
-      api.upsertDeviceSummary(fromPeerId, {
+      const summaryPatch = {
         modelName: obj.modelName ?? undefined,
-        battery,
+        battery: obj.battery,
         storage:
           obj.storage && typeof obj.storage === 'object'
             ? { total: obj.storage.total, free: obj.storage.free }
@@ -737,33 +733,31 @@ export default class RoomClient {
                 linkSpeedMbps: obj.wifi.linkSpeedMbps,
               }
             : undefined,
-        ip:
-          typeof obj.publicIp === 'string'
-            ? obj.publicIp
-            : typeof obj.ip === 'string'
-              ? obj.ip
-              : undefined,
+        ip: nextIp,
         lastSeen: ts,
-      });
+        ...(controllerBattery != null ? { controllerBattery } : {}),
+      };
 
-      const nextIp =
-        typeof obj.publicIp === 'string'
-          ? obj.publicIp
-          : typeof obj.ip === 'string'
-            ? obj.ip
-            : undefined;
-
-      // UI에서 바로 쓰는 top-level 필드도 갱신
+      // 스토어 반영
+      api.upsertDeviceSummary(fromPeerId, summaryPatch);
       api.updatePeerFields(
         fromPeerId,
         pruneNullish({
           ssid: obj?.wifi?.ssid,
           bssid: obj?.wifi?.bssid,
-          ip: nextIp, // nextIp 없으면 키 자체가 제거됨 → 기존 값 유지
+          ip: nextIp,
           publicIp: nextIp,
           lastSeen: ts,
+          controllerBattery,
         }),
       );
+
+      // indexDB 스냅샷
+      upsertDeviceSnapshot({
+        peerId: fromPeerId,
+        displayName: api.peers.find((p) => p.id === fromPeerId)?.displayName ?? fromPeerId,
+        ...summaryPatch,
+      });
 
       // ip가 바뀌었으면
       if (nextIp) {

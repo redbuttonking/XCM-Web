@@ -3,7 +3,10 @@ export type PeerCard = {
   modelName?: string;
   displayName?: string;
   battery?: BatteryObj;
-  controllerBattery?: number;
+  controllerBattery?: {
+    left?: number;
+    right?: number;
+  };
   isConnected?: boolean;
   ip?: string;
   placeLabel?: string;
@@ -53,7 +56,10 @@ export type StorageSnapshot = {
 export type StatusSummary = {
   modelName?: string;
   battery?: number | BatteryObj;
-  controllerBattery?: number; // 0..100 (VR 컨트롤러 등)
+  controllerBattery?: {
+    left?: number;
+    right?: number;
+  }; // 0..100 (VR 컨트롤러 등)
   ssid?: string;
   bssid?: string | null;
   ip?: string; // local ip
@@ -82,7 +88,10 @@ export type DeviceRecord = {
   displayName?: string;
   modelName?: string;
   battery?: number | BatteryObj;
-  controllerBattery?: number;
+  controllerBattery?: {
+    left?: number;
+    right?: number;
+  };
   ssid?: string;
   ip?: string;
   geoCity?: string;

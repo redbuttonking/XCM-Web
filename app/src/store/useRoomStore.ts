@@ -151,7 +151,8 @@ const mergeWithoutUndefined = (base: any, patch: any) => {
 
 // 기기 상테 리렌더 조절 헬퍼
 const LAST_SEEN_BUCKET_MS = 60_000; // 추천: 30~60초 중 택1
-const TIME_KEYS = new Set(['lastSeen', 'summaryUpdatedAt', 'detailUpdatedAt']);
+
+const PRESERVE_IF_NULL_OR_EMPTY = new Set(['geoCity']);
 
 const bucket = (t?: number) => {
   return typeof t === 'number' ? Math.floor(t / LAST_SEEN_BUCKET_MS) : undefined;
@@ -164,16 +165,6 @@ const shallowEqual = (a: any, b: any) => {
   const kb = Object.keys(b);
   if (ka.length !== kb.length) return false;
   for (const k of ka) {
-    if (a[k] !== b[k]) return false;
-  }
-  return true;
-};
-
-// shallow equal but ignore TIME_KEYS0
-const shallowEqualOmit = (a: any, b: any, omit: Set<string>) => {
-  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-  for (const k of keys) {
-    if (omit.has(k)) continue;
     if (a[k] !== b[k]) return false;
   }
   return true;
@@ -310,9 +301,31 @@ export const useRoomStore = create<RoomState>((set, get) => ({
       if (idx === -1) return {};
 
       const cur = state.peers[idx];
-      const next = mergeWithoutUndefined(cur, partial);
 
-      // 의미있는 변화가 있을 때만 배열 교체
+      // 1) 덮어쓰면 안 되는 값들 정리
+      const safePatch: any = { ...partial };
+
+      // null/'' 보호 (geoCity 등)
+      for (const k of Object.keys(safePatch)) {
+        if (!PRESERVE_IF_NULL_OR_EMPTY.has(k)) continue;
+        const v = safePatch[k];
+        if (v === null || (typeof v === 'string' && v.trim() === '')) {
+          delete safePatch[k];
+        }
+      }
+
+      // 숫자 필드 방어 (NaN 같은 비정상 값 제거)
+      if ('geoLat' in safePatch && !Number.isFinite(Number(safePatch.geoLat))) {
+        delete safePatch.geoLat;
+      }
+      if ('geoLon' in safePatch && !Number.isFinite(Number(safePatch.geoLon))) {
+        delete safePatch.geoLon;
+      }
+
+      // 2) 마지막에 undefined만 무시하는 머지 적용 (유지!)
+      const next = mergeWithoutUndefined(cur, safePatch);
+
+      if (shallowEqual(cur, next)) return {};
       const peers = state.peers.slice();
       peers[idx] = next;
       return { peers };
@@ -403,7 +416,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
                 ...p,
                 geoLat: ok ? lat : p.geoLat,
                 geoLon: ok ? lon : p.geoLon,
-                geoCity: displayPlace || p.geoCity,
+                ...(displayPlace ? { geoCity: displayPlace } : {}),
                 // 성공일 때만 lastGeoResolvedIp 갱신! (실패 시 갱신 금지 → 다음에 재시도 가능)
                 lastGeoResolvedIp: ok ? ip : p.lastGeoResolvedIp,
                 // (선택) ok가 아닐 땐 geoAccuracyM 건드리지 않음

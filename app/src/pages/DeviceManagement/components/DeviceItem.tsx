@@ -29,12 +29,12 @@ type Props = {
   onToggle: () => void;
 };
 
-const batteryIcon = (level?: number) => {
-  if (level == null) return <BatteryMedium className="size-4 opacity-60" />;
-  if (level >= 75) return <BatteryFull className="size-4" />;
-  if (level >= 35) return <BatteryMedium className="size-4" />;
-  return <BatteryLow className="size-4" />;
-};
+// const batteryIcon = (level?: number) => {
+//   if (level == null) return <BatteryMedium className="size-4 opacity-60" />;
+//   if (level >= 75) return <BatteryFull className="size-4" />;
+//   if (level >= 35) return <BatteryMedium className="size-4" />;
+//   return <BatteryLow className="size-4" />;
+// };
 
 const batteryBarClass = (level?: number) => {
   if (level == null) return 'bg-gray-300';
@@ -113,9 +113,7 @@ const DeviceItem = memo(({ peer, expanded, onToggle }: Props) => {
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="truncate text-base font-semibold">
-              {peer.modelName ?? 'Unknown Device'}
-            </span>
+            <span className="truncate text-lg font-semibold">{peer.displayName}</span>
             <span
               className={clsx(
                 'inline-flex items-center rounded-md px-2 py-0.5 text-sm',
@@ -125,25 +123,56 @@ const DeviceItem = memo(({ peer, expanded, onToggle }: Props) => {
               {peer.isConnected ? 'Connected' : 'Offline'}
             </span>
           </div>
-          <div className="mt-0.5 flex flex-wrap items-center gap-3 text-sm text-gray-600">
+          <div className="mt-0.5 flex flex-wrap items-center gap-3 text-sm font-bold text-gray-600">
             <span className="inline-flex items-center gap-1">
-              <User className="size-4 opacity-70" />
-              {peer.displayName}
+              모델명 : {peer.modelName ?? 'Unknown Device'}
             </span>
 
             <span className="inline-flex items-center gap-1">
-              {batteryIcon(level)}
-              {level != null ? `${level}%` : '-'}
-              <span className="ml-2 h-2 w-24 overflow-hidden rounded bg-gray-200">
+              {isHMD ? (
+                <img src="/public/icons/headset-icon.svg" />
+              ) : (
+                <Smartphone className={clsx('size-5')} />
+              )}
+
+              <span className="ml-1 h-[14px] w-8 overflow-hidden rounded bg-gray-200">
                 <span
-                  className={clsx('block h-2', batteryBarClass(level))}
+                  className={clsx('block h-full', batteryBarClass(level))}
                   style={{ width: `${Math.max(0, Math.min(100, level ?? 0))}%` }}
                 />
               </span>
+              {level != null ? `${level}%` : '-'}
+            </span>
+
+            <span className="inline-flex items-center gap-2">
+              <img
+                className="group-data-[collapsed=true]:pr-[0px]"
+                src="/public/icons/controller-icon.svg"
+              />
+              <div className="flex items-center justify-center gap-1">
+                <span className="inline-flex size-[18px] select-none items-center justify-center rounded-full border border-current text-[10px] font-semibold leading-none text-current">
+                  L
+                </span>
+                {peer.controllerBattery?.left === -1 ? (
+                  <span>-</span>
+                ) : (
+                  <span>{peer.controllerBattery?.left}%</span>
+                )}
+              </div>
+              <div className="flex items-center justify-center gap-1">
+                <span className="inline-flex size-[18px] select-none items-center justify-center rounded-full border border-current text-[10px] font-semibold leading-none text-current">
+                  R
+                </span>
+                {peer.controllerBattery?.right === -1 ? (
+                  <span>-</span>
+                ) : (
+                  <span>{peer.controllerBattery?.right}%</span>
+                )}
+              </div>
             </span>
 
             <span className="inline-flex items-center gap-1">
-              <Wifi className="size-4 opacity-70" />
+              <Wifi className="size-5 opacity-70" />
               <span className="truncate">{peer.ssid ?? wifi.ssid ?? '-'}</span>
             </span>
           </div>

@@ -26,11 +26,22 @@ import qs from 'qs';
 interface Params {
   [key: string]: string;
 }
+type ExtraQuery = Record<string, string | number | boolean | null | undefined>;
 
-export function getProtooUrl(params: Params): string {
+export function getProtooUrl(baseParams: Params, extraQuery?: ExtraQuery): string {
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
   const host = window.location.host; // ex) localhost:3000
-  const query = qs.stringify(params);
+
+  // ✅ 기본 params + extraQuery 병합 (빈 값 제거)
+  const merged: Record<string, string | number | boolean> = {};
+  const all = { ...baseParams, ...(extraQuery || {}) };
+
+  for (const [k, v] of Object.entries(all)) {
+    if (v === undefined || v === null || v === '') continue;
+    merged[k] = v as string | number | boolean;
+  }
+
+  const query = qs.stringify(merged);
   // 프록시 경로로 붙는다 → Vite가 4443으로 터널링
   return `${protocol}://${host}/ws?${query}`;
 }
