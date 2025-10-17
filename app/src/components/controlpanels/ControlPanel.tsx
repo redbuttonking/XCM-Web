@@ -56,7 +56,7 @@ const ControlPanel = ({
   const stopDisabled = !hasSelection || !allRecording || mixedRecording;
 
   return (
-    <div className="flex w-full max-w-[800px] flex-col items-center text-center">
+    <div className="flex w-full max-w-[600px] flex-col items-center text-center">
       <div className="flex flex-wrap items-center justify-center gap-2 rounded-2xl border-2 border-[#A5A5A5] bg-white px-3 py-3 shadow">
         {/* 오디오 실행하기 */}
         {/* <PanelButton
@@ -100,7 +100,7 @@ const ControlPanel = ({
         />
 
         {/* peer 비디오 새로고침(Consumer) */}
-        <PanelButton icon={<RotateCcw />} label="새로고침" onClick={onMediaReconnect} />
+        {/* <PanelButton icon={<RotateCcw />} label="새로고침" onClick={onMediaReconnect} /> */}
 
         {/* 녹화 시작 */}
         <PanelButton

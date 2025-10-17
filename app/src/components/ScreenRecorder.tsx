@@ -93,7 +93,7 @@ const ScreenRecorder = () => {
       setIsRecording(true);
     } catch (error) {
       console.error('전체화면 녹화 시작 실패:', error);
-      alert('전체화면 녹화를 시작할 수 없습니다.');
+      // alert('전체화면 녹화를 시작할 수 없습니다.');
       store.fail(peerId, String(error));
     }
   };

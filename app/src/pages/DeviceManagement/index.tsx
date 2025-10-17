@@ -65,9 +65,12 @@ const DeviceManagement = () => {
     // 1-2) 온라인이 오면 덮어쓰기 (실시간 우선)
     for (const live of peers ?? []) {
       const prev = byId.get(live.id);
+      const liveClean = pruneNullish(live);
       byId.set(live.id, {
         ...(prev ?? ({} as PeerCard)),
-        ...live,
+        ...liveClean,
+        // geoCity는 live에 유효 문자열이 있을 때만 교체, 없으면 prev 유지
+        geoCity: (typeof live.geoCity === 'string' && live.geoCity.trim()) || prev?.geoCity,
         // 온라인 값 없으면 캐시로 보강(옵션)
         battery: live.battery ?? prev?.battery,
         wifi: live.wifi ?? prev?.wifi,
@@ -116,7 +119,15 @@ const DeviceManagement = () => {
   // 첫 진입 시 1회 로드 (또는 필요하면 visibility 변화 때 재로드)
   useEffect(() => {
     loadCachedPeerCards()
-      .then(setCachedPeers)
+      .then((rows) =>
+        setCachedPeers(
+          rows.map((p) => ({
+            ...p,
+            geoCity:
+              typeof p.geoCity === 'string' && p.geoCity.trim() ? p.geoCity.trim() : undefined, // false, '', null 모두 걷어냄
+          })),
+        ),
+      )
       .catch((e) => console.warn('[DeviceManagement] cache load failed:', e));
   }, []);
 
@@ -167,7 +178,8 @@ const DeviceManagement = () => {
               bssid: wifi.bssid,
               geoCity:
                 (typeof msg?.payload?.region === 'string' && msg.payload.region) ||
-                (typeof msg?.payload?.geoCity === 'string' && msg.payload.geoCity),
+                (typeof msg?.payload?.geoCity === 'string' && msg.payload.geoCity) ||
+                undefined,
               placeLabel: resolvePlaceLabel(placeMap, wifi.ssid, wifi.bssid),
 
               geoLat: typeof g?.lat === 'number' ? g.lat : undefined,
