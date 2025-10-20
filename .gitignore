@@ -9,4 +9,4 @@ node_modules/
 
 /app/dist/
 
-server/GeoLite2-City.mmdb
+# server/GeoLite2-City.mmdb
