@@ -1,36 +1,79 @@
 // src/hooks/useFixVideoDuration.ts
-import { useEffect } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 
-export function useFixVideoDuration(video: HTMLVideoElement | null, srcKey: string) {
+type VideoTarget = HTMLVideoElement | null | RefObject<HTMLVideoElement>;
+
+export function useFixVideoDuration(target: VideoTarget, srcKey?: string) {
+  const fixedForSrcRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!video) return;
+    // target이 ref인지, element인지 판별해서 실제 엘리먼트를 얻는다.
+    const el: HTMLVideoElement | null =
+      target && typeof target === 'object' && 'current' in (target as any)
+        ? (target as RefObject<HTMLVideoElement>).current
+        : (target as HTMLVideoElement | null);
 
-    const onLoadedMetadata = () => {
-      // duration이 비정상(0/Infinity/너무 짧음)하면 재계산 유도
-      if (!isFinite(video.duration) || video.duration === 0 || video.duration < 2) {
-        const onTimeUpdate = () => {
-          video.removeEventListener('timeupdate', onTimeUpdate);
-          try {
-            video.currentTime = 0;
-          } catch {}
-        };
-        video.addEventListener('timeupdate', onTimeUpdate);
+    if (!el || !srcKey) return;
+    if (fixedForSrcRef.current === srcKey) return; // 같은 파일은 한 번만 보정
 
+    let fixing = false;
+    let cancelled = false;
+
+    const onTimeUpdate = () => {
+      if (!fixing) return;
+      fixing = false;
+      fixedForSrcRef.current = srcKey;
+      if (!cancelled) {
         try {
-          // 매우 큰 시간으로 점프 → 내부적으로 끝까지 스캔하며 duration 계산
-          video.currentTime = 1e9;
-        } catch {
-          // 간혹 바로 실패할 수 있어 한 틱 뒤 재시도
-          setTimeout(() => {
-            try {
-              video.currentTime = 1e9;
-            } catch {}
-          }, 0);
-        }
+          el.currentTime = 0;
+        } catch {}
+      }
+      el.removeEventListener('timeupdate', onTimeUpdate);
+      el.removeEventListener('seeking', onSeeking);
+    };
+
+    const onSeeking = () => {
+      // 사용자가 탐색하면 보정 즉시 중단(간섭 방지)
+      if (!fixing) return;
+      cancelled = true;
+      fixing = false;
+      el.removeEventListener('timeupdate', onTimeUpdate);
+    };
+
+    const startFix = () => {
+      if (fixing) return;
+      fixing = true;
+      cancelled = false;
+      el.addEventListener('timeupdate', onTimeUpdate);
+      el.addEventListener('seeking', onSeeking);
+      try {
+        el.currentTime = 1e6; // 내부 스캔 유도
+      } catch {
+        setTimeout(() => {
+          try {
+            el.currentTime = 1e6;
+          } catch {}
+        }, 0);
       }
     };
 
-    video.addEventListener('loadedmetadata', onLoadedMetadata);
-    return () => video.removeEventListener('loadedmetadata', onLoadedMetadata);
-  }, [video, srcKey]);
+    const onLoadedMeta = () => {
+      const ok = Number.isFinite(el.duration) && el.duration > 0 && (el.seekable?.length ?? 0) > 0;
+
+      if (ok) {
+        fixedForSrcRef.current = srcKey; // 이미 정상 → 보정 스킵
+        return;
+      }
+      startFix();
+    };
+
+    if (el.readyState >= 1) onLoadedMeta();
+    else el.addEventListener('loadedmetadata', onLoadedMeta);
+
+    return () => {
+      el.removeEventListener('loadedmetadata', onLoadedMeta);
+      el.removeEventListener('timeupdate', onTimeUpdate);
+      el.removeEventListener('seeking', onSeeking);
+    };
+  }, [target, srcKey]);
 }

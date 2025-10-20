@@ -1,185 +1,28 @@
-// // src/components/KakaoMiniMap.tsx
-// import { useEffect, useMemo, useRef } from 'react';
-// import { useRoomStore } from '@/store/useRoomStore';
-// import { loadKakaoSdk } from '@/lib/kakao';
-
-// type PeerOnMap = {
-//   id: string;
-//   displayName?: string;
-//   lat: number;
-//   lon: number;
-//   acc?: number;
-//   lastSeen?: number;
-// };
-
-// const APPKEY = import.meta.env.VITE_KAKAO_MAP_KEY as string; // .env.local에 설정한 키
-// // const key = import.meta.env.
-// export default function KakaoMiniMap() {
-//   // 1) store에서 좌표가 있는 peer만 추출
-//   const peers = useRoomStore((s) => s.peers);
-//   const locatedPeers: PeerOnMap[] = useMemo(
-//     () =>
-//       (peers ?? [])
-//         .filter((p) => typeof p.geoLat === 'number' && typeof p.geoLon === 'number')
-//         .map((p) => ({
-//           id: p.id,
-//           displayName: p.displayName,
-//           lat: p.geoLat as number,
-//           lon: p.geoLon as number,
-//           acc: p.geoAccuracyM,
-//           lastSeen: p.lastSeen,
-//         })),
-//     [peers],
-//   );
-
-//   // 2) 기본 센터(아무도 없을 때)
-//   const defaultCenter: [number, number] = locatedPeers.length
-//     ? [locatedPeers[0].lat, locatedPeers[0].lon]
-//     : [37.5665, 126.978]; // 서울 시청 근처
-
-//   // 3) 카카오맵 객체 & 오버레이 레퍼런스
-//   const mapDivRef = useRef<HTMLDivElement | null>(null);
-//   const mapRef = useRef<any>(null);
-//   const overlaysRef = useRef<{ markers: any[]; circles: any[]; infoWindows: any[] }>({
-//     markers: [],
-//     circles: [],
-//     infoWindows: [],
-//   });
-
-//   // 4) 초기 로드: SDK 불러오고 맵 생성
-//   useEffect(() => {
-//     if (!mapDivRef.current) return;
-//     let destroyed = false;
-
-//     (async () => {
-//       const kakao = await loadKakaoSdk(APPKEY, ['services']); // services 라이브러리 로드
-//       if (destroyed) return;
-
-//       const center = new kakao.maps.LatLng(defaultCenter[0], defaultCenter[1]);
-//       mapRef.current = new kakao.maps.Map(mapDivRef.current, { center, level: 5 });
-
-//       renderPeers();
-//       fitAll();
-//     })();
-
-//     return () => {
-//       destroyed = true;
-//       clearOverlays();
-//       mapRef.current = null;
-//     };
-//     // eslint-disable-next-line react-hooks/exhaustive-deps
-//   }, []); // 최초 1회
-
-//   // 5) peers 변경 시 반영
-//   const geoSig = useMemo(
-//     () =>
-//       JSON.stringify(
-//         locatedPeers.map((p) => [
-//           p.id,
-//           +p.lat.toFixed(5),
-//           +p.lon.toFixed(5),
-//           Math.round(p.acc ?? 0),
-//         ]),
-//       ),
-//     [locatedPeers],
-//   );
-//   useEffect(() => {
-//     if (!mapRef.current) return;
-//     renderPeers();
-//     fitAll();
-//   }, [geoSig]);
-
-//   useEffect(() => {
-//     console.log('피어의 값이 뭐게', locatedPeers);
-//   }, []);
-
-//   // --- helpers ---
-//   const clearOverlays = () => {
-//     const { markers, circles, infoWindows } = overlaysRef.current;
-//     markers.forEach((m) => m.setMap(null));
-//     circles.forEach((c) => c.setMap(null));
-//     infoWindows.forEach((i) => i.close());
-//     overlaysRef.current = { markers: [], circles: [], infoWindows: [] };
-//   };
-
-//   const renderPeers = () => {
-//     const kakao = window.kakao;
-//     if (!kakao || !mapRef.current) return;
-
-//     clearOverlays();
-
-//     locatedPeers.forEach((p) => {
-//       const pos = new kakao.maps.LatLng(p.lat, p.lon);
-
-//       const marker = new kakao.maps.Marker({ position: pos });
-//       marker.setMap(mapRef.current);
-
-//       const radius = typeof p.acc === 'number' ? p.acc : 200; // m
-//       const circle = new kakao.maps.Circle({
-//         center: pos,
-//         radius,
-//         strokeWeight: 2,
-//         strokeColor: '#4B5563',
-//         strokeOpacity: 0.6,
-//         fillColor: '#3B82F6',
-//         fillOpacity: 0.2,
-//       });
-//       circle.setMap(mapRef.current);
-
-//       const html = `
-//         <div style="min-width:180px">
-//           <div style="font-weight:700;margin-bottom:4px">${p.displayName ?? p.id}</div>
-//           <div>Lat/Lon: ${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}</div>
-//           ${typeof p.acc === 'number' ? `<div>Accuracy: ±${Math.round(p.acc)}m</div>` : ''}
-//           ${p.lastSeen ? `<div style="color:#666">Seen: ${new Date(p.lastSeen).toLocaleString()}</div>` : ''}
-//         </div>
-//       `;
-//       const iw = new kakao.maps.InfoWindow({ position: pos, content: html });
-//       kakao.maps.event.addListener(marker, 'click', () => iw.open(mapRef.current, marker));
-
-//       overlaysRef.current.markers.push(marker);
-//       overlaysRef.current.circles.push(circle);
-//       overlaysRef.current.infoWindows.push(iw);
-//     });
-//   };
-
-//   const fitAll = () => {
-//     const kakao = window.kakao;
-//     if (!kakao || !mapRef.current) return;
-
-//     if (!locatedPeers.length) {
-//       // 아무도 없으면 기본 센터/레벨로
-//       mapRef.current.setCenter(new kakao.maps.LatLng(defaultCenter[0], defaultCenter[1]));
-//       mapRef.current.setLevel(5);
-//       return;
-//     }
-
-//     const bounds = new kakao.maps.LatLngBounds();
-//     locatedPeers.forEach((p) => bounds.extend(new kakao.maps.LatLng(p.lat, p.lon)));
-//     mapRef.current.setBounds(bounds);
-
-//     // 너무 가까우면 레벨 보정
-//     const level = mapRef.current.getLevel();
-//     if (level < 2) mapRef.current.setLevel(2);
-//   };
-
-//   // 6) 컨테이너 (높이 250px 고정: 예전 Mini 스타일)
-//   return <div ref={mapDivRef} className="h-[250px] w-full overflow-hidden rounded-xl border" />;
-// }
-
 // src/components/KakaoMiniMap.tsx
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import clsx from 'clsx';
+import { Loader2 } from 'lucide-react';
 import { loadKakaoSdk } from '@/lib/kakao';
 
 type KakaoMiniMapProps = {
-  center: { lat: number; lon: number }; // 필수
-  acc?: number; // 정확도(m)
-  label?: string; // 디바이스 이름
-  lastSeen?: number; // timestamp(ms)
-  level?: number; // 초기 줌 레벨(옵션)
+  center: { lat: number; lon: number };
+  acc?: number;
+  label?: string;
+  lastSeen?: number;
+  level?: number;
 };
 
 const APPKEY = import.meta.env.VITE_KAKAO_MAP_KEY as string;
+
+function distanceMeters(a: { lat: number; lon: number }, b: { lat: number; lon: number }) {
+  const R = 6371000;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLon = ((b.lon - a.lon) * Math.PI) / 180;
+  const la1 = (a.lat * Math.PI) / 180;
+  const la2 = (b.lat * Math.PI) / 180;
+  const x = Math.sin(dLat / 2) ** 2 + Math.sin(dLon / 2) ** 2 * Math.cos(la1) * Math.cos(la2);
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(x)));
+}
 
 export default function KakaoMiniMap({ center, acc, label, lastSeen, level }: KakaoMiniMapProps) {
   const divRef = useRef<HTMLDivElement | null>(null);
@@ -188,94 +31,190 @@ export default function KakaoMiniMap({ center, acc, label, lastSeen, level }: Ka
   const circleRef = useRef<any>(null);
   const infoRef = useRef<any>(null);
 
-  // 1) 최초 1회: SDK 로드 + 맵/오버레이 생성
+  const [ready, setReady] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [autoTrack, setAutoTrack] = useState(true);
+  const userInteractingRef = useRef(false);
+  const prevPosRef = useRef<{ lat: number; lon: number } | null>(null);
+  const prevAccRef = useRef<number | undefined>(undefined);
+
+  // 1) 최초 1회: SDK 로드 + 맵 구성
   useEffect(() => {
     let dead = false;
     if (!divRef.current) return;
 
     (async () => {
-      const kakao = await loadKakaoSdk(APPKEY, ['services']);
-      if (dead || !divRef.current) return;
+      try {
+        setReady(false);
+        setErr(null);
 
-      const pos = new kakao.maps.LatLng(center.lat, center.lon);
-      mapRef.current = new kakao.maps.Map(divRef.current, { center: pos, level: level ?? 5 });
+        const kakao = await loadKakaoSdk(APPKEY, ['services']);
+        if (dead || !divRef.current) return;
 
-      markerRef.current = new kakao.maps.Marker({ position: pos });
-      markerRef.current.setMap(mapRef.current);
+        kakao.maps.load(() => {
+          if (dead || !divRef.current) return;
 
-      const radius = typeof acc === 'number' ? acc : 200;
-      circleRef.current = new kakao.maps.Circle({
-        center: pos,
-        radius: typeof acc === 'number' ? acc : 200,
-        strokeWeight: 2,
-        strokeColor: '#4B5563',
-        strokeOpacity: 0.6,
-        fillColor: '#3B82F6',
-        fillOpacity: 0.2,
-      });
-      circleRef.current.setMap(mapRef.current);
+          const pos = new kakao.maps.LatLng(center.lat, center.lon);
+          const map = new kakao.maps.Map(divRef.current, { center: pos, level: level ?? 5 });
+          mapRef.current = map;
+          prevPosRef.current = { lat: center.lat, lon: center.lon };
 
-      infoRef.current = new kakao.maps.InfoWindow({
-        position: pos,
-        content: buildInfo(label, center.lat, center.lon, acc, lastSeen),
-      });
-      kakao.maps.event.addListener(markerRef.current, 'click', () =>
-        infoRef.current.open(mapRef.current, markerRef.current),
-      );
+          // 사용자 조작 감지 → 자동 추적 해제
+          const onUser = () => {
+            userInteractingRef.current = true;
+            if (autoTrack) setAutoTrack(false);
+            window.setTimeout(() => {
+              userInteractingRef.current = false;
+            }, 600);
+          };
+          kakao.maps.event.addListener(map, 'dragstart', onUser);
+          kakao.maps.event.addListener(map, 'zoom_changed', onUser);
 
-      fitToRadius(kakao, mapRef.current, { lat: center.lat, lon: center.lon }, radius);
+          const marker = new kakao.maps.Marker({ position: pos });
+          marker.setMap(map);
+          markerRef.current = marker;
+
+          const radius = typeof acc === 'number' ? acc : 200;
+          const circle = new kakao.maps.Circle({
+            center: pos,
+            radius,
+            strokeWeight: 2,
+            strokeColor: '#4B5563',
+            strokeOpacity: 0.6,
+            fillColor: '#3B82F6',
+            fillOpacity: 0.2,
+          });
+          circle.setMap(map);
+          circleRef.current = circle;
+          prevAccRef.current = radius;
+
+          const info = new kakao.maps.InfoWindow({
+            position: pos,
+            content: buildInfo(label, center.lat, center.lon, acc, lastSeen),
+          });
+          infoRef.current = info;
+          kakao.maps.event.addListener(marker, 'click', () => info.open(map, marker));
+
+          setReady(true);
+        });
+      } catch (e: any) {
+        console.error('[KakaoMiniMap] init failed:', e);
+        setErr(e?.message || 'init failed');
+        setReady(false);
+      }
     })();
 
     return () => {
       dead = true;
       if (markerRef.current) markerRef.current.setMap(null);
       if (circleRef.current) circleRef.current.setMap(null);
-      infoRef.current?.close();
+      infoRef.current?.close?.();
       mapRef.current = null;
       markerRef.current = null;
       circleRef.current = null;
       infoRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // 최초 1회만
+  }, []);
 
-  // 2) props가 바뀌면 오버레이만 업데이트
-  const sig = useMemo(
+  // 2-A) 지오메트리(센터/정확도) 변화에만 반응 (뷰포트 이동은 조건부)
+  const geomSig = useMemo(
     () =>
       JSON.stringify({
         lat: +center.lat.toFixed(6),
         lon: +center.lon.toFixed(6),
         acc: typeof acc === 'number' ? Math.round(acc) : undefined,
-        label,
-        seen: lastSeen ? Math.floor(lastSeen / 1000) : undefined,
       }),
-    [center.lat, center.lon, acc, label, lastSeen],
+    [center.lat, center.lon, acc],
   );
 
   useEffect(() => {
     const kakao = (window as any).kakao;
-    if (!kakao || !mapRef.current) return;
+    const map = mapRef.current;
+    if (!kakao || !map) return;
 
     const pos = new kakao.maps.LatLng(center.lat, center.lon);
     markerRef.current?.setPosition(pos);
 
-    const nextRadius = typeof acc === 'number' ? acc : (circleRef.current?.getRadius?.() ?? 200);
-
-    circleRef.current?.setOptions({
-      center: pos,
-      radius: nextRadius,
-    });
-
-    if (infoRef.current) {
-      infoRef.current.setPosition(pos);
-      infoRef.current.setContent(buildInfo(label, center.lat, center.lon, acc, lastSeen));
+    const nextRadius = typeof acc === 'number' ? acc : (prevAccRef.current ?? 200);
+    // 정확도 변화가 3m 이상일 때만 반영
+    if (
+      circleRef.current &&
+      (prevAccRef.current == null || Math.abs(nextRadius - prevAccRef.current) > 3)
+    ) {
+      circleRef.current.setOptions({ center: pos, radius: nextRadius });
+      prevAccRef.current = nextRadius;
+    } else {
+      circleRef.current?.setOptions({ center: pos });
     }
 
-    mapRef.current.setCenter(pos);
-    fitToRadius(kakao, mapRef.current, { lat: center.lat, lon: center.lon }, nextRadius);
-  }, [sig]);
+    // 뷰포트는 자동추적 & 거리 임계 초과시에만 부드럽게 이동
+    if (autoTrack && !userInteractingRef.current) {
+      const cur = map.getCenter?.();
+      const curPos = cur ? { lat: cur.getLat(), lon: cur.getLng() } : null;
+      const prev = prevPosRef.current;
 
-  return <div ref={divRef} className="h-[250px] w-full overflow-hidden rounded-xl border" />;
+      // 이전 적용 좌표와의 거리
+      const distFromPrev = prev
+        ? distanceMeters(prev, { lat: center.lat, lon: center.lon })
+        : Infinity;
+
+      // 현재 화면 중심과도 비교해 필요할 때만 panTo
+      if (!curPos || distanceMeters(curPos, { lat: center.lat, lon: center.lon }) > 15) {
+        map.panTo(pos);
+        prevPosRef.current = { lat: center.lat, lon: center.lon };
+      } else if (distFromPrev > 15) {
+        // 사용자 중심은 비슷하지만 데이터 기준 위치가 많이 바뀐 경우 prev만 갱신
+        prevPosRef.current = { lat: center.lat, lon: center.lon };
+      }
+    }
+  }, [geomSig, autoTrack]);
+
+  // 2-B) 메타 정보(라벨/라스트씬)만 바뀌면 InfoWindow 내용만 갱신 (뷰포트 X)
+  const infoSig = useMemo(
+    () =>
+      JSON.stringify({
+        label,
+        seen: lastSeen ? Math.floor(lastSeen / 1000) : undefined,
+      }),
+    [label, lastSeen],
+  );
+
+  useEffect(() => {
+    if (!infoRef.current) return;
+    infoRef.current.setContent(buildInfo(label, center.lat, center.lon, acc, lastSeen));
+  }, [infoSig]); // 뷰포트 이동 없음
+
+  return (
+    <div
+      className="relative h-[250px] w-full overflow-hidden rounded-xl border"
+      aria-busy={!ready}
+      aria-live="polite"
+    >
+      <div
+        ref={divRef}
+        className={clsx(
+          'h-full w-full transition-opacity duration-300',
+          ready ? 'opacity-100' : 'opacity-0',
+        )}
+      />
+
+      {!ready && (
+        <div className="absolute inset-0 grid place-items-center bg-gray-50">
+          <div className="flex items-center gap-2 text-gray-600">
+            {!err ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                <span>지도 불러오는 중…</span>
+              </>
+            ) : (
+              <span>지도를 불러오지 못했습니다</span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function buildInfo(label?: string, lat?: number, lon?: number, acc?: number, lastSeen?: number) {
@@ -287,24 +226,4 @@ function buildInfo(label?: string, lat?: number, lon?: number, acc?: number, las
       ${lastSeen ? `<div style="color:#666">Seen: ${new Date(lastSeen).toLocaleString()}</div>` : ''}
     </div>
   `;
-}
-
-function fitToRadius(kakao: any, map: any, center: { lat: number; lon: number }, radiusM: number) {
-  if (!kakao || !map || !center || !isFinite(center.lat) || !isFinite(center.lon)) return;
-
-  const r = Math.max(1, radiusM || 200); // 최소 1m
-  const lat = center.lat;
-  const lon = center.lon;
-  const bounds = new kakao.maps.LatLngBounds();
-
-  const dLat = r / 111320; // 위도 1도 ≈ 111.32km
-  const cos = Math.cos((lat * Math.PI) / 180);
-  const dLon = r / (111320 * (cos || 1e-6)); // 극지방 보호용 epsilon
-
-  bounds.extend(new kakao.maps.LatLng(lat + dLat, lon + dLon));
-  bounds.extend(new kakao.maps.LatLng(lat - dLat, lon - dLon));
-
-  map.setBounds(bounds);
-  const level = map.getLevel();
-  if (level < 2) map.setLevel(2);
 }

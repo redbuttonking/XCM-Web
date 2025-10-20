@@ -190,14 +190,14 @@ const RecordingManagement = () => {
                   >
                     파일 삭제{selected.length > 0 ? ` (${selected.length})` : ''}
                   </Button>
-                  <Button
+                  {/* <Button
                     variant="outline"
                     className="h-11 rounded-md border border-gray-300 text-gray-400"
                     disabled
                     title="준비 중"
                   >
                     파일 공유
-                  </Button>
+                  </Button> */}
                 </div>
               </div>
 

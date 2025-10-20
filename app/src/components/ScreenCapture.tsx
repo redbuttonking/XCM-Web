@@ -53,7 +53,7 @@ const ScreenCapture = () => {
       captureWhenReady();
     } catch (error) {
       console.error('스크린 캡처 실패:', error);
-      alert('스크린 캡처에 실패했습니다.');
+      // alert('스크린 캡처에 실패했습니다.');
     }
   }
 

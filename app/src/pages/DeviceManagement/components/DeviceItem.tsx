@@ -29,13 +29,6 @@ type Props = {
   onToggle: () => void;
 };
 
-// const batteryIcon = (level?: number) => {
-//   if (level == null) return <BatteryMedium className="size-4 opacity-60" />;
-//   if (level >= 75) return <BatteryFull className="size-4" />;
-//   if (level >= 35) return <BatteryMedium className="size-4" />;
-//   return <BatteryLow className="size-4" />;
-// };
-
 const batteryBarClass = (level?: number) => {
   if (level == null) return 'bg-gray-300';
   if (level <= 30) return 'bg-red-500'; // 빨강
@@ -46,14 +39,14 @@ const batteryBarClass = (level?: number) => {
 const formatGB = (n?: number, digits = 1) =>
   typeof n === 'number' ? `${n.toFixed(digits)} GB` : '-';
 
-const rssiBadge = (rssi?: number) => {
-  if (typeof rssi !== 'number') return { text: '-', cls: 'bg-gray-200 text-gray-700' };
-  // 대략적인 품질 구간
-  if (rssi >= -55) return { text: `${rssi} dBm (강함)`, cls: 'bg-emerald-100 text-emerald-700' };
-  if (rssi >= -67) return { text: `${rssi} dBm (양호)`, cls: 'bg-lime-100 text-lime-700' };
-  if (rssi >= -75) return { text: `${rssi} dBm (보통)`, cls: 'bg-amber-100 text-amber-700' };
-  return { text: `${rssi} dBm (약함)`, cls: 'bg-rose-100 text-rose-700' };
-};
+// const rssiBadge = (rssi?: number) => {
+//   if (typeof rssi !== 'number') return { text: '-', cls: 'bg-gray-200 text-gray-700' };
+//   // 대략적인 품질 구간
+//   if (rssi >= -55) return { text: `${rssi} dBm (강함)`, cls: 'bg-emerald-100 text-emerald-700' };
+//   if (rssi >= -67) return { text: `${rssi} dBm (양호)`, cls: 'bg-lime-100 text-lime-700' };
+//   if (rssi >= -75) return { text: `${rssi} dBm (보통)`, cls: 'bg-amber-100 text-amber-700' };
+//   return { text: `${rssi} dBm (약함)`, cls: 'bg-rose-100 text-rose-700' };
+// };
 
 const DeviceItem = memo(({ peer, expanded, onToggle }: Props) => {
   const level: number | undefined = peer.battery?.level;
@@ -61,7 +54,8 @@ const DeviceItem = memo(({ peer, expanded, onToggle }: Props) => {
   const isHMD = ['quest', 'meta', 'oculus'].some((k) =>
     (peer.modelName ?? '').toLowerCase().includes(k),
   );
-  const rssiInfo = rssiBadge(wifi.rssiDbm);
+
+  // const rssiInfo = rssiBadge(wifi.rssiDbm);
 
   // 저장공간 계산 (bytes 단위 가정: total/free가 KB면 적절히 바꿔줘)
   const total = (peer as any).storage?.total;
@@ -76,10 +70,10 @@ const DeviceItem = memo(({ peer, expanded, onToggle }: Props) => {
       : undefined;
 
   // 미디어 상태 (있으면 true)
-  const hasMicTx = !!(peer as any).audioTrack;
-  const hasVidTx = !!(peer as any).videoTrack;
-  const hasMicRx = !!(peer as any).audioConsumerId;
-  const hasVidRx = !!(peer as any).videoConsumerId;
+  // const hasMicTx = !!(peer as any).audioTrack;
+  // const hasVidTx = !!(peer as any).videoTrack;
+  // const hasMicRx = !!(peer as any).audioConsumerId;
+  // const hasVidRx = !!(peer as any).videoConsumerId;
 
   return (
     <div
@@ -236,7 +230,7 @@ const DeviceItem = memo(({ peer, expanded, onToggle }: Props) => {
               />
             )}
             {/* 미디어 상태 */}
-            <div className="rounded-xl border p-3">
+            {/* <div className="rounded-xl border p-3">
               <div className="mb-2 flex items-center gap-2 text-sm font-bold">
                 <Mic className="size-4" />
                 미디어 상태
@@ -285,7 +279,7 @@ const DeviceItem = memo(({ peer, expanded, onToggle }: Props) => {
                   {(peer as any).videoConsumerId ?? '-'}
                 </div>
               ) : null}
-            </div>
+            </div> */}
           </div>
 
           {/* 저장공간 & 메모/앱 */}
