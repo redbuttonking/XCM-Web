@@ -31,29 +31,38 @@ const cache = new Map<string, CacheEntry>();
 const inflight = new Map<string, Promise<GeoIpResult>>();
 
 /**
- * ipapi(무료) 기본 엔드포인트 https://ipapi.co/{ip}/json/
+ * ipgeolocation(무료 버전)
  * 응답 예시는 사용자가 보낸 JSON과 동일한 필드 구조를 가정.
- * CORS 허용됨(무료 플랜 기준). 필요 시 헤더 조정.
  */
+// api 키가 담긴 env 파일 필요
+const API_KEY = import.meta.env.VITE_IPGEOLOCATION_KEY as string;
+
 async function fetchGeoIp(ip: string): Promise<GeoIpResult> {
-  const url = `https://ipapi.co/${encodeURIComponent(ip)}/json/`;
+  if (!API_KEY) throw new Error('Missing VITE_IPGEOLOCATION_API_KEY');
+
+  // v1 (/ipgeo)나 v2 (/v2/ipgeo) 아무거나 써도 되도록 매핑을 유연하게
+  const url = `https://api.ipgeolocation.io/ipgeo?apiKey=${encodeURIComponent(API_KEY)}&ip=${encodeURIComponent(ip)}`;
 
   const res = await fetch(url, { method: 'GET' });
-  if (!res.ok) throw new Error(`ipapi failed: ${res.status}`);
+  if (!res.ok) throw new Error(`ipgeolocation failed: ${res.status}`);
   const j = await res.json();
 
-  // 필드 매핑(사용 중인 UI/Store에 맞게 최소한만 추림)
-  const data: GeoIpResult = {
-    ip: String(j.ip ?? ip),
-    city: j.city,
-    region: j.region,
-    country_name: j.country_name ?? j.country ?? undefined,
-    latitude: typeof j.latitude === 'number' ? j.latitude : undefined,
-    longitude: typeof j.longitude === 'number' ? j.longitude : undefined,
-    postal: j.postal,
-  };
+  const loc = j.location ?? {}; // v2에서는 location.* 안에 들어있음
+  const latNum = Number(j.latitude ?? loc.latitude);
+  const lonNum = Number(j.longitude ?? loc.longitude);
 
-  return data;
+  return {
+    ip: String(j.ip ?? j.ip_address ?? ip),
+    // ✅ city 우선
+    city: loc.city ?? j.city ?? undefined,
+    region: loc.state_prov ?? j.state_prov ?? j.region ?? undefined,
+    country_name: loc.country_name ?? j.country_name ?? j.country ?? undefined,
+    postal: loc.zipcode ?? j.zipcode ?? j.postal ?? undefined,
+    latitude: Number.isFinite(latNum) ? latNum : undefined,
+    longitude: Number.isFinite(lonNum) ? lonNum : undefined,
+    lat: Number.isFinite(latNum) ? latNum : undefined,
+    lon: Number.isFinite(lonNum) ? lonNum : undefined,
+  };
 }
 
 /**
