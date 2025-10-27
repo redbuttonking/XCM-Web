@@ -176,9 +176,11 @@ const DeviceManagement = () => {
             pruneNullish({
               ssid: wifi.ssid,
               bssid: wifi.bssid,
+              // ✅ city > geoCity > region
               geoCity:
-                (typeof msg?.payload?.region === 'string' && msg.payload.region) ||
+                (typeof msg?.payload?.city === 'string' && msg.payload.city) ||
                 (typeof msg?.payload?.geoCity === 'string' && msg.payload.geoCity) ||
+                (typeof msg?.payload?.region === 'string' && msg.payload.region) ||
                 undefined,
               placeLabel: resolvePlaceLabel(placeMap, wifi.ssid, wifi.bssid),
 
@@ -239,6 +241,21 @@ const DeviceManagement = () => {
   //   const timer = setInterval(tick, 15_000);
   //   return () => clearInterval(timer);
   // }, [joined, roomClient]);
+
+  useEffect(() => {
+    console.log(
+      '[check]',
+      (peers ?? []).map((p) => ({
+        id: p.id,
+        ip: (p as any).ip ?? p.publicIp,
+        city: p.geoCity,
+        lat: p.geoLat,
+        lon: p.geoLon,
+        lastGeoResolvedIp: p.lastGeoResolvedIp,
+      })),
+    );
+    console.log(peers);
+  }, [peers]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">

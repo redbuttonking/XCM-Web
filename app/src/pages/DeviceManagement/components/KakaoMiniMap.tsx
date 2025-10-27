@@ -12,6 +12,7 @@ type KakaoMiniMapProps = {
   level?: number;
 };
 
+// api 키가 담긴 env 파일 필요
 const APPKEY = import.meta.env.VITE_KAKAO_MAP_KEY as string;
 
 function distanceMeters(a: { lat: number; lon: number }, b: { lat: number; lon: number }) {

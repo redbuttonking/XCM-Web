@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type RoomClient from '../core/RoomClient'; // 실제 경로에 맞게 수정할 것
+import type RoomClient from '../core/RoomClient';
 import type { DeviceTimestamps, StatusSummary } from '@/types/device';
 import { resolveGeoIp, invalidateGeoIp } from '@/core/geoIp';
 
@@ -402,10 +402,10 @@ export const useRoomStore = create<RoomState>((set, get) => ({
       // 문자열/undefined 케이스 대비 숫자 변환
       const lat = Number(r.latitude ?? r.lat);
       const lon = Number(r.longitude ?? r.lon);
-      const region = r.region ?? null;
       const city = r.city ?? null;
+      const region = r.region ?? null;
       const country = r.country_name ?? null;
-      const displayPlace = region ?? city ?? country ?? null;
+      const displayPlace = city ?? region ?? country ?? null;
 
       const ok = Number.isFinite(lat) && Number.isFinite(lon);
 

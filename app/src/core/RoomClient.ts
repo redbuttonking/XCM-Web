@@ -811,9 +811,13 @@ export default class RoomClient {
           pruneNullish({
             geoLat: p.geo.lat,
             geoLon: p.geo.lon,
-            geoAccuracyM: p.geoAccuracy ?? null, // null이면 키 제거
+            geoAccuracyM: p.geoAccuracy ?? null,
+            // ✅ city > region > 기존 geoCity
+            geoCity:
+              (typeof p.city === 'string' && p.city) ||
+              (typeof p.region === 'string' && p.region) ||
+              p.geoCity,
             placeLabel: p.placeLabel,
-            geoCity: typeof p.region === 'string' ? p.region : p.geoCity,
             lastSeen: msg.ts,
           }),
         );
